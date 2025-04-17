@@ -1,0 +1,58 @@
+-- Users table
+CREATE TABLE IF NOT EXISTS users (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(20) NOT NULL UNIQUE,
+  email VARCHAR(50) NOT NULL UNIQUE,
+  password VARCHAR(120) NOT NULL,
+  mfa_enabled BOOLEAN DEFAULT FALSE,
+  mfa_secret VARCHAR(64),
+  create_date_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_date_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Roles table
+CREATE TABLE IF NOT EXISTS roles (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(20) NOT NULL
+);
+
+-- Junction table for many-to-many relationship
+CREATE TABLE IF NOT EXISTS user_roles (
+  user_id BIGINT NOT NULL,
+  role_id BIGINT NOT NULL,
+  PRIMARY KEY (user_id, role_id),
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (role_id) REFERENCES roles(id)
+);
+
+-- Category table
+CREATE TABLE IF NOT EXISTS category (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(100) NOT NULL,
+  create_date_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_date_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Article table
+CREATE TABLE IF NOT EXISTS article (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(100) NOT NULL,
+  content TEXT NOT NULL,
+  category_id BIGINT,
+  status_enum INT DEFAULT 0,
+  image_path VARCHAR(255),
+  image_url VARCHAR(1024),
+  create_date_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_date_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (category_id) REFERENCES category(id)
+);
+
+-- Comment table
+CREATE TABLE IF NOT EXISTS comment (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  article_comment VARCHAR(255) NOT NULL,
+  article_id BIGINT,
+  create_date_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_date_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (article_id) REFERENCES article(id)
+); 

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Blog Application</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        header {
+            background-color: #333;
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+        .username {
+            margin-right: 15px;
+        }
+        .logout-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .logout-btn:hover {
+            background-color: #45a049;
+        }
+        main {
+            flex: 1;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        .welcome-message {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .content-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            transition: transform 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .card h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .card p {
+            color: #666;
+        }
+        .card .category {
+            display: inline-block;
+            background-color: #f1f1f1;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-top: 10px;
+        }
+        footer {
+            background-color: #333;
+            color: white;
+            text-align: center;
+            padding: 1rem;
+            margin-top: auto;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Blog Application</h1>
+        <div class="user-info">
+            <span class="username" id="username"></span>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </header>
+    
+    <main>
+        <div class="welcome-message">
+            <h2>Welcome to your Dashboard</h2>
+            <p>Here are the latest articles from our blog</p>
+        </div>
+        
+        <div id="articles-container" class="content-container">
+            <!-- Articles will be loaded here -->
+        </div>
+    </main>
+    
+    <footer>
+        <p>&copy; 2025 Blog Application</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if user is logged in
+            const token = localStorage.getItem('jwtToken');
+            if (!token) {
+                window.location.href = '/';
+                return;
+            }
+            
+            // Fetch user information
+            fetchUserInfo();
+            
+            // Fetch articles
+            fetchArticles();
+        });
+        
+        function fetchUserInfo() {
+            const token = localStorage.getItem('jwtToken');
+            
+            fetch('/api/auth/userinfo', {
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to fetch user info');
+                }
+                return response.json();
+            })
+            .then(userInfo => {
+                document.getElementById('username').textContent = 'Welcome, ' + userInfo.username;
+            })
+            .catch(error => {
+                console.error('Error fetching user info:', error);
+                // If there's an error, redirect to login
+                window.location.href = '/';
+            });
+        }
+        
+        function fetchArticles() {
+            const token = localStorage.getItem('jwtToken');
+            
+            fetch('/api/articles', {
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        // Token expired or invalid
+                        localStorage.removeItem('jwtToken');
+                        window.location.href = '/';
+                        return;
+                    }
+                    throw new Error('Failed to fetch articles');
+                }
+                return response.json();
+            })
+            .then(articles => {
+                displayArticles(articles);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('articles-container').innerHTML = 
+                    '<div class="card"><h3>Error</h3><p>Failed to load articles. Please try again later.</p></div>';
+            });
+        }
+        
+        function displayArticles(articles) {
+            const container = document.getElementById('articles-container');
+            
+            if (!articles || articles.length === 0) {
+                container.innerHTML = '<div class="card"><h3>No Articles</h3><p>There are no articles to display.</p></div>';
+                return;
+            }
+            
+            let html = '';
+            
+            articles.forEach(article => {
+                html += `
+                    <div class="card">
+                        <h3>${article.title}</h3>
+                        <p>${article.content.substring(0, 100)}...</p>
+                        <span class="category">${article.categoryId ? 'Category ' + article.categoryId : 'Uncategorized'}</span>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function logout() {
+            localStorage.removeItem('jwtToken');
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html> 

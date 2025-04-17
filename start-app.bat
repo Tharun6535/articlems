@@ -1,0 +1,16 @@
+@echo off
+echo Starting Blog Application...
+
+echo Starting Spring Boot Backend on port 8081...
+start cmd /k "cd %~dp0 && .\mvnw.cmd spring-boot:run"
+
+echo Waiting for the backend to start...
+timeout /t 20
+
+echo Starting React Frontend on port 3000...
+start cmd /k "cd %~dp0\blog-frontend && npm start"
+
+echo Both applications are starting. Please wait for them to fully initialize...
+echo Backend: http://localhost:8081
+echo Frontend: http://localhost:3000
+echo API Test Page: http://localhost:3000/api-test 
