@@ -7,4 +7,6 @@ public interface UserService {
     User findById(Long id);
     Optional<User> findByUsername(String username);
     User save(User user);
+    Optional<User> findByEmail(String email);
+    void updatePassword(User user, String newPassword);
 } 

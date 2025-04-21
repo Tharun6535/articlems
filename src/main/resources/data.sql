@@ -5,12 +5,12 @@ INSERT INTO roles(name) SELECT 'ROLE_ADMIN' WHERE NOT EXISTS (SELECT 1 FROM role
 -- Insert default admin user if it doesn't exist
 INSERT INTO users(username, email, password, create_date_time, update_date_time) 
 SELECT 'admin', 'admin@example.com', '$2a$10$Vd9/n12xBQpA2HWN09WWruQgH8uymKm8VRRZEUbVaGP2guBXPB3aW', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin');
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin' OR email = 'admin@example.com');
 
 -- Insert default user if it doesn't exist
 INSERT INTO users(username, email, password, create_date_time, update_date_time) 
 SELECT 'user', 'user@example.com', '$2a$10$Vd9/n12xBQpA2HWN09WWruQgH8uymKm8VRRZEUbVaGP2guBXPB3aW', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'user');
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'user' OR email = 'user@example.com');
 
 -- Assign admin role to admin user if not already assigned
 INSERT INTO user_roles(user_id, role_id)

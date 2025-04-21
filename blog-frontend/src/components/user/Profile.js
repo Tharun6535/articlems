@@ -114,7 +114,7 @@ const Profile = () => {
         try {
           const response = await UserService.get2FAStatus();
           console.log("2FA status response:", response.data);
-          setIs2FAEnabled(response.data.isEnabled);
+          setIs2FAEnabled(response.data);
         } catch (error) {
           console.error('Error checking 2FA status:', error);
           if (error.response && error.response.status === 401) {

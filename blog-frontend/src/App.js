@@ -4,9 +4,10 @@ import {
   AppBar, Toolbar, Typography, Button, Container, Box, IconButton, 
   Menu, MenuItem, Drawer, List, ListItem, ListItemText, ListItemIcon,
   Divider, Tooltip, Avatar, useMediaQuery, useTheme, Badge,
-  ListItemButton, CssBaseline, Paper, Fade, Chip, LinearProgress
+  ListItemButton, CssBaseline, Paper, Fade, Chip, LinearProgress,
+  InputBase, Slide, Dialog, DialogContent, Backdrop, CircularProgress
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, styled } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
 import HomeIcon from '@mui/icons-material/Home';
 import ArticleIcon from '@mui/icons-material/Article';
@@ -25,6 +26,7 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import PeopleIcon from '@mui/icons-material/People';
 
 // Theme Provider
 import ThemeProvider, { ThemeContext } from './contexts/ThemeContext';
@@ -45,8 +47,55 @@ import CategoryDetail from './components/categories/CategoryDetail';
 import AdminDashboard from './components/admin/AdminDashboard';
 import CsvImporter from './components/admin/CsvImporter';
 import TestArticleForm from './components/articles/TestArticleForm';
+import UserManagement from './components/admin/UserManagement';
+import Home from './components/Home';
 
-// Custom components
+// Custom styled components
+const SearchWrapper = styled('div')(({ theme }) => ({
+  position: 'relative',
+  borderRadius: 24,
+  backgroundColor: alpha(theme.palette.mode === 'light' ? theme.palette.common.black : theme.palette.common.white, 0.08),
+  '&:hover': {
+    backgroundColor: alpha(theme.palette.mode === 'light' ? theme.palette.common.black : theme.palette.common.white, 0.12),
+  },
+  marginRight: theme.spacing(2),
+  marginLeft: 0,
+  width: '100%',
+  [theme.breakpoints.up('sm')]: {
+    marginLeft: theme.spacing(3),
+    width: 'auto',
+  },
+  transition: 'all 0.3s ease',
+}));
+
+const SearchIconWrapper = styled('div')(({ theme }) => ({
+  padding: theme.spacing(0, 2),
+  height: '100%',
+  position: 'absolute',
+  pointerEvents: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+}));
+
+const StyledInputBase = styled(InputBase)(({ theme }) => ({
+  color: 'inherit',
+  width: '100%',
+  '& .MuiInputBase-input': {
+    padding: theme.spacing(1, 1, 1, 0),
+    paddingLeft: `calc(1em + ${theme.spacing(4)})`,
+    transition: theme.transitions.create('width'),
+    width: '100%',
+    [theme.breakpoints.up('md')]: {
+      width: '20ch',
+      '&:focus': {
+        width: '30ch',
+      },
+    },
+  },
+}));
+
+// Custom navigation components
 const MobileNavItem = ({ icon, label, to, onClick }) => {
   return (
     <ListItem disablePadding>
@@ -56,10 +105,10 @@ const MobileNavItem = ({ icon, label, to, onClick }) => {
         onClick={onClick}
         sx={{ 
           py: 1.5,
-          borderRadius: '8px',
+          borderRadius: '10px',
           mx: 1,
           '&:hover': {
-            backgroundColor: 'rgba(0, 82, 204, 0.08)',
+            backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.08),
           }
         }}
       >
@@ -78,6 +127,44 @@ const MobileNavItem = ({ icon, label, to, onClick }) => {
   );
 };
 
+// Custom loading component
+const FullPageLoader = () => {
+  const theme = useTheme();
+  
+  return (
+    <Box sx={{ 
+      display: 'flex', 
+      flexDirection: 'column',
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      height: '100vh',
+      backgroundColor: theme.palette.background.default 
+    }}>
+      <Box sx={{ position: 'relative', mb: 4 }}>
+        <CircularProgress size={60} thickness={4} />
+        <Box sx={{ 
+          position: 'absolute', 
+          top: 0, 
+          left: 0, 
+          bottom: 0, 
+          right: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <Typography variant="h5" component="div" sx={{ fontWeight: 800, color: 'primary.main' }}>
+            PC
+          </Typography>
+        </Box>
+      </Box>
+      <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>Loading ProContent</Typography>
+      <Box sx={{ width: 300 }}>
+        <LinearProgress color="primary" />
+      </Box>
+    </Box>
+  );
+};
+
 function AppContent() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -89,6 +176,10 @@ function AppContent() {
   const isDark = mode === 'dark';
   const { user, loading } = useAuth();
   const [pageLoading, setPageLoading] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [notificationsAnchorEl, setNotificationsAnchorEl] = useState(null);
+  const [articleLogs, setArticleLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
   
   const appName = "ProContent";
 
@@ -124,30 +215,34 @@ function AppContent() {
   const handleUserMenuClose = () => {
     setAnchorEl(null);
   };
+  
+  const handleNotificationsOpen = async (event) => {
+    setNotificationsAnchorEl(event.currentTarget);
+    setLogsLoading(true);
+    try {
+      const res = await fetch('/api/logs/article');
+      const logs = await res.json();
+      setArticleLogs(logs.reverse()); // Show newest first
+    } catch (e) {
+      setArticleLogs(['Failed to fetch logs']);
+    }
+    setLogsLoading(false);
+  };
+  
+  const handleNotificationsClose = () => {
+    setNotificationsAnchorEl(null);
+  };
+  
+  const toggleSearch = () => {
+    setSearchOpen(!searchOpen);
+  };
 
   // Protected route component
   const ProtectedRoute = ({ children, roles = [] }) => {
     const location = useLocation();
     
     if (loading) {
-      return (
-        <Box sx={{ 
-          display: 'flex', 
-          flexDirection: 'column',
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          height: '100vh',
-          backgroundColor: theme.palette.background.default 
-        }}>
-          <Box sx={{ width: '80px', height: '80px', mb: 3 }}>
-            <img src="/logo192.png" alt="Logo" style={{ width: '100%', height: '100%' }} />
-          </Box>
-          <Typography variant="h6" sx={{ mb: 2 }}>Loading your application</Typography>
-          <Box sx={{ width: 300 }}>
-            <LinearProgress color="primary" />
-          </Box>
-        </Box>
-      );
+      return <FullPageLoader />;
     }
 
     if (!user) {
@@ -160,6 +255,8 @@ function AppContent() {
 
     return children;
   };
+
+  const drawerWidth = 280;
 
   return (
     <>
@@ -180,70 +277,73 @@ function AppContent() {
             zIndex: theme.zIndex.drawer + 1,
             borderBottom: '1px solid',
             borderColor: 'divider',
-            backgroundColor: isDark ? 'grey.900' : 'background.paper'
+            backgroundColor: isDark ? 'background.paper' : 'background.paper',
+            backdropFilter: 'blur(8px)',
+            boxShadow: theme.shadows[1]
           }}
         >
-          <Toolbar sx={{ justifyContent: 'space-between' }}>
+          <Toolbar sx={{ justifyContent: 'space-between', height: 70 }}>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               {isMobile && (
                 <IconButton
                   edge="start"
                   aria-label="menu"
                   onClick={toggleDrawer}
-                  sx={{ mr: 1 }}
+                  sx={{ 
+                    mr: 1,
+                    color: 'text.primary',
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.08)
+                    }
+                  }}
                 >
                   <MenuIcon />
                 </IconButton>
               )}
               
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Avatar 
+                  sx={{ 
+                    width: 36, 
+                    height: 36, 
+                    mr: 1, 
+                    background: theme.palette.mode === 'dark' 
+                      ? 'linear-gradient(45deg, #4cc9f0, #4361ee)' 
+                      : 'linear-gradient(45deg, #4361ee, #3a0ca3)'
+                  }}
+                >
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, fontSize: '1rem' }}>
+                    PC
+                  </Typography>
+                </Avatar>
               <Typography 
-                variant="h5" 
+                  variant="h6"
+                  noWrap
                 component={Link} 
                 to="/" 
                 sx={{ 
-                  color: 'primary.main', 
                   textDecoration: 'none',
+                    color: 'text.primary',
                   fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  letterSpacing: '-0.5px',
+                    display: { xs: 'none', sm: 'block' }
                 }}
               >
-                <ArticleIcon sx={{ mr: 1, color: 'primary.main' }} />
                 {appName}
               </Typography>
+              </Box>
               
               {!isMobile && (
-                <Box sx={{ ml: 4, display: 'flex' }}>
+                <Box sx={{ display: 'flex', ml: 3 }}>
                   <Button 
                     component={Link} 
                     to="/" 
                     sx={{ 
+                      fontWeight: 500, 
                       mx: 0.5,
-                      px: 2,
-                      py: 1,
-                      fontWeight: 600,
-                      borderRadius: '4px',
+                      borderRadius: 2,
                       color: 'text.primary',
-                      position: 'relative',
-                      '&::after': {
-                        content: '""',
-                        position: 'absolute',
-                        width: '100%',
-                        transform: 'scaleX(0)',
-                        height: '2px',
-                        bottom: 0,
-                        left: 0,
-                        backgroundColor: 'primary.main',
-                        transformOrigin: 'bottom right',
-                        transition: 'transform 0.3s ease-out'
-                      },
                       '&:hover': {
-                        backgroundColor: 'transparent',
-                        '&::after': {
-                          transform: 'scaleX(1)',
-                          transformOrigin: 'bottom left'
-                        }
+                        backgroundColor: alpha(theme.palette.primary.main, 0.08)
                       }
                     }}
                   >
@@ -253,31 +353,12 @@ function AppContent() {
                     component={Link} 
                     to="/articles" 
                     sx={{ 
+                      fontWeight: 500, 
                       mx: 0.5,
-                      px: 2,
-                      py: 1,
-                      fontWeight: 600,
-                      borderRadius: '4px',
+                      borderRadius: 2,
                       color: 'text.primary',
-                      position: 'relative',
-                      '&::after': {
-                        content: '""',
-                        position: 'absolute',
-                        width: '100%',
-                        transform: 'scaleX(0)',
-                        height: '2px',
-                        bottom: 0,
-                        left: 0,
-                        backgroundColor: 'primary.main',
-                        transformOrigin: 'bottom right',
-                        transition: 'transform 0.3s ease-out'
-                      },
                       '&:hover': {
-                        backgroundColor: 'transparent',
-                        '&::after': {
-                          transform: 'scaleX(1)',
-                          transformOrigin: 'bottom left'
-                        }
+                        backgroundColor: alpha(theme.palette.primary.main, 0.08)
                       }
                     }}
                   >
@@ -287,31 +368,12 @@ function AppContent() {
                     component={Link} 
                     to="/categories" 
                     sx={{ 
+                      fontWeight: 500, 
                       mx: 0.5,
-                      px: 2,
-                      py: 1,
-                      fontWeight: 600,
-                      borderRadius: '4px',
+                      borderRadius: 2,
                       color: 'text.primary',
-                      position: 'relative',
-                      '&::after': {
-                        content: '""',
-                        position: 'absolute',
-                        width: '100%',
-                        transform: 'scaleX(0)',
-                        height: '2px',
-                        bottom: 0,
-                        left: 0,
-                        backgroundColor: 'primary.main',
-                        transformOrigin: 'bottom right',
-                        transition: 'transform 0.3s ease-out'
-                      },
                       '&:hover': {
-                        backgroundColor: 'transparent',
-                        '&::after': {
-                          transform: 'scaleX(1)',
-                          transformOrigin: 'bottom left'
-                        }
+                        backgroundColor: alpha(theme.palette.primary.main, 0.08)
                       }
                     }}
                   >
@@ -322,249 +384,289 @@ function AppContent() {
             </Box>
             
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              {/* Theme toggle button */}
-              <Tooltip title={`Toggle ${isDark ? 'light' : 'dark'} mode`}>
+              {/* Search button/bar */}
+              {!isSmall && (
+                <Fade in={searchOpen}>
+                  <SearchWrapper sx={{ display: searchOpen ? 'block' : 'none' }}>
+                    <SearchIconWrapper>
+                      <SearchIcon />
+                    </SearchIconWrapper>
+                    <StyledInputBase
+                      placeholder="Search…"
+                      inputProps={{ 'aria-label': 'search' }}
+                      autoFocus={searchOpen}
+                    />
+                  </SearchWrapper>
+                </Fade>
+              )}
+
+              <IconButton 
+                onClick={toggleSearch} 
+                sx={{ 
+                  color: searchOpen ? 'primary.main' : 'text.primary',
+                  backgroundColor: searchOpen ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.08)
+                  }
+                }}
+              >
+                {searchOpen ? <CloseIcon /> : <SearchIcon />}
+              </IconButton>
+              
+              {/* Notifications */}
+              <IconButton 
+                onClick={handleNotificationsOpen}
+                sx={{ 
+                  ml: 1,
+                  color: 'text.primary',
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.08)
+                  }
+                }}
+              >
+                <Badge badgeContent={3} color="error">
+                  <NotificationsIcon />
+                </Badge>
+              </IconButton>
+              <Menu
+                anchorEl={notificationsAnchorEl}
+                open={Boolean(notificationsAnchorEl)}
+                onClose={handleNotificationsClose}
+                PaperProps={{
+                  elevation: 3,
+                  sx: { 
+                    width: 320,
+                    maxHeight: 380,
+                    mt: 1.5,
+                    borderRadius: 2,
+                    overflow: 'hidden'
+                  }
+                }}
+                transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+              >
+                <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="subtitle1" fontWeight={600}>
+                    Article Logs
+                  </Typography>
+                </Box>
+                {logsLoading ? (
+                  <MenuItem>
+                    <CircularProgress size={20} sx={{ mr: 2 }} /> Loading...
+                  </MenuItem>
+                ) : (
+                  articleLogs.map((log, idx) => (
+                    <MenuItem key={idx} sx={{ py: 1.5, px: 2 }}>
+                      <Typography variant="body2">{log}</Typography>
+                    </MenuItem>
+                  ))
+                )}
+                <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider', textAlign: 'center' }}>
+                  <Button size="small" sx={{ width: '100%' }}>
+                    View all logs
+                  </Button>
+                </Box>
+              </Menu>
+              
+              {/* Theme toggle */}
+              <Tooltip title={isDark ? "Light Mode" : "Dark Mode"}>
                 <IconButton 
-                  color="inherit" 
                   onClick={toggleColorMode} 
-                  sx={{ mr: 1 }}
+                  sx={{ 
+                    ml: 1,
+                    color: 'text.primary',
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.08)
+                    }
+                  }}
                 >
                   {isDark ? <Brightness7Icon /> : <Brightness4Icon />}
                 </IconButton>
               </Tooltip>
               
-              {currentUser ? (
+              {/* User menu */}
+              {user ? (
                 <>
-                  <Tooltip title={`Logged in as ${currentUser.username}`}>
-                    <IconButton
+                  <Button
                       onClick={handleUserMenuOpen}
-                      size="small"
-                      sx={{ 
-                        ml: 0.5,
-                        border: '2px solid',
-                        borderColor: 'primary.main',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
+                    startIcon={
                       <Avatar 
                         sx={{ 
                           width: 32,
                           height: 32,
-                          background: 'linear-gradient(45deg, #0052CC 30%, #4C9AFF 90%)',
-                          fontSize: '1rem',
-                          fontWeight: 'bold'
+                          border: '2px solid',
+                          borderColor: 'primary.main'
                         }}
                       >
-                        {currentUser.username.charAt(0).toUpperCase()}
+                        {user.username.charAt(0).toUpperCase()}
                       </Avatar>
-                    </IconButton>
-                  </Tooltip>
+                    }
+                    endIcon={<ExpandMoreIcon />}
+                    sx={{ 
+                      ml: 2,
+                      textTransform: 'none',
+                      color: 'text.primary',
+                      '&:hover': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.08)
+                      }
+                    }}
+                  >
+                    {!isSmall && user.username}
+                  </Button>
                   <Menu
                     anchorEl={anchorEl}
-                    id="user-menu"
                     open={Boolean(anchorEl)}
                     onClose={handleUserMenuClose}
-                    onClick={handleUserMenuClose}
-                    transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-                    anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
                     PaperProps={{
                       elevation: 3,
                       sx: {
-                        overflow: 'visible',
-                        filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.1))',
-                        mt: 1.5,
                         width: 220,
-                        borderRadius: '8px',
-                        '& .MuiAvatar-root': {
-                          width: 32,
-                          height: 32,
-                          ml: -0.5,
-                          mr: 1,
-                        },
-                        '&:before': {
-                          content: '""',
-                          display: 'block',
-                          position: 'absolute',
-                          top: 0,
-                          right: 14,
-                          width: 10,
-                          height: 10,
-                          bgcolor: 'background.paper',
-                          transform: 'translateY(-50%) rotate(45deg)',
-                          zIndex: 0,
-                        },
-                      },
+                        mt: 1.5,
+                        borderRadius: 2,
+                        overflow: 'hidden'
+                      }
                     }}
+                    transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                    anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
                   >
-                    <Box sx={{ px: 2, py: 1.5 }}>
+                    <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
                       <Typography variant="subtitle1" fontWeight={600}>
-                        {currentUser.username}
+                        {user.username}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {currentUser.email || 'user@example.com'}
+                        {user.email}
                       </Typography>
                     </Box>
-                    <Divider />
                     <MenuItem 
                       component={Link}
                       to="/profile"
-                      sx={{ 
-                        py: 1.5,
-                        px: 2,
-                        '&:hover': { backgroundColor: 'rgba(0, 82, 204, 0.08)' }
-                      }}
+                      onClick={handleUserMenuClose}
+                      sx={{ py: 1.5 }}
                     >
                       <ListItemIcon>
-                        <AccountCircleIcon fontSize="small" color="primary" />
+                        <AccountCircleIcon fontSize="small" />
                       </ListItemIcon>
-                      <Typography variant="body2">Profile</Typography>
+                      <ListItemText primary="Profile" />
                     </MenuItem>
-                    {currentUser.roles && currentUser.roles.includes('ROLE_ADMIN') && (
+                    {user.roles && user.roles.includes("ROLE_ADMIN") && (
                       <MenuItem 
                         component={Link}
                         to="/admin"
-                        sx={{ 
-                          py: 1.5,
-                          px: 2,
-                          '&:hover': { backgroundColor: 'rgba(0, 82, 204, 0.08)' }
-                        }}
+                        onClick={handleUserMenuClose}
+                        sx={{ py: 1.5 }}
                       >
                         <ListItemIcon>
-                          <AdminPanelSettingsIcon fontSize="small" color="primary" />
+                          <AdminPanelSettingsIcon fontSize="small" />
                         </ListItemIcon>
-                        <Typography variant="body2">Admin Dashboard</Typography>
+                        <ListItemText primary="Admin Panel" />
                       </MenuItem>
                     )}
-                    <Divider />
-                    <MenuItem 
+                    <Box sx={{ px: 1, pb: 1 }}>
+                      <Button 
+                        fullWidth 
+                        variant="outlined" 
+                        color="error"
+                        startIcon={<LogoutIcon />}
                       onClick={logOut}
-                      sx={{ 
-                        py: 1.5,
-                        px: 2,
-                        color: 'error.main',
-                        '&:hover': { backgroundColor: 'rgba(229, 9, 20, 0.08)' }
-                      }}
-                    >
-                      <ListItemIcon>
-                        <LogoutIcon fontSize="small" color="error" />
-                      </ListItemIcon>
-                      <Typography variant="body2">Logout</Typography>
-                    </MenuItem>
+                        sx={{ mt: 1 }}
+                      >
+                        Logout
+                      </Button>
+                    </Box>
                   </Menu>
                 </>
               ) : (
                 <>
-                  {!isSmall && (
                     <Button 
                       component={Link} 
                       to="/login" 
                       variant="outlined"
                       color="primary"
+                    startIcon={<LoginIcon />}
                       sx={{ 
-                        mx: 1,
-                        whiteSpace: 'nowrap',
-                        px: 2,
-                        py: 0.8,
-                        borderWidth: 1.5,
-                        '&:hover': {
-                          borderWidth: 1.5
-                        }
-                      }}
-                    >
-                      Sign In
+                      ml: 2,
+                      display: { xs: 'none', sm: 'flex' }
+                    }}
+                  >
+                    Login
                     </Button>
-                  )}
                   <Button 
                     component={Link} 
                     to="/register" 
                     variant="contained"
                     color="primary"
-                    sx={{ py: 0.8 }}
+                    startIcon={<PersonAddIcon />}
+                    sx={{ 
+                      ml: 2,
+                      display: { xs: 'none', sm: 'flex' }
+                    }}
                   >
-                    Sign Up
+                    Register
                   </Button>
+                  <IconButton
+                    component={Link}
+                    to="/login"
+                    sx={{ 
+                      ml: 1,
+                      display: { xs: 'flex', sm: 'none' },
+                      color: 'text.primary',
+                      '&:hover': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.08)
+                      }
+                    }}
+                  >
+                    <LoginIcon />
+                  </IconButton>
                 </>
               )}
             </Box>
           </Toolbar>
         </AppBar>
 
-        {/* Mobile Navigation Drawer */}
+        {/* Mobile drawer */}
         <Drawer
-          anchor="left"
+          variant="temporary"
           open={isDrawerOpen}
           onClose={toggleDrawer}
-          PaperProps={{
-            sx: {
-              width: 280,
-              borderRadius: 0,
-              backgroundColor: theme.palette.background.paper,
-            },
+          ModalProps={{
+            keepMounted: true, // Better open performance on mobile
+          }}
+          sx={{
+            display: { xs: 'block', md: 'none' },
+            '& .MuiDrawer-paper': { width: drawerWidth, boxSizing: 'border-box' },
           }}
         >
-          <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="h6" fontWeight={600} color="primary.main">
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between',
+            p: 2
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Avatar 
+                sx={{ 
+                  width: 40, 
+                  height: 40, 
+                  mr: 2,
+                  background: theme.palette.mode === 'dark' 
+                    ? 'linear-gradient(45deg, #4cc9f0, #4361ee)' 
+                    : 'linear-gradient(45deg, #4361ee, #3a0ca3)'
+                }}
+              >
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
+                  PC
+                </Typography>
+              </Avatar>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
               {appName}
             </Typography>
+            </Box>
             <IconButton onClick={toggleDrawer}>
               <CloseIcon />
             </IconButton>
           </Box>
           <Divider />
-          
-          <Box sx={{ p: 2 }}>
-            {currentUser ? (
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Avatar 
-                  sx={{ 
-                    width: 42, 
-                    height: 42, 
-                    background: 'linear-gradient(45deg, #0052CC 30%, #4C9AFF 90%)',
-                    mr: 2 
-                  }}
-                >
-                  {currentUser.username.charAt(0).toUpperCase()}
-                </Avatar>
-                <Box>
-                  <Typography variant="subtitle1" fontWeight={600}>
-                    {currentUser.username}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {currentUser.email || 'user@example.com'}
-                  </Typography>
-                </Box>
-              </Box>
-            ) : (
-              <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
-                <Button 
-                  component={Link} 
-                  to="/login" 
-                  variant="outlined"
-                  color="primary"
-                  size="small"
-                  onClick={toggleDrawer}
-                  sx={{ flex: 1 }}
-                >
-                  Sign In
-                </Button>
-                <Button 
-                  component={Link} 
-                  to="/register" 
-                  variant="contained"
-                  color="primary"
-                  size="small"
-                  onClick={toggleDrawer}
-                  sx={{ flex: 1 }}
-                >
-                  Sign Up
-                </Button>
-              </Box>
-            )}
-          </Box>
-          
-          <Divider />
-          
-          <List sx={{ pt: 1 }}>
+          <List sx={{ p: 1 }}>
             <MobileNavItem 
               icon={<HomeIcon />} 
               label="Home" 
@@ -583,157 +685,208 @@ function AppContent() {
               to="/categories" 
               onClick={toggleDrawer}
             />
-            {currentUser && (
-              <>
+            {user && (
                 <MobileNavItem 
                   icon={<AccountCircleIcon />} 
                   label="Profile" 
                   to="/profile" 
                   onClick={toggleDrawer}
                 />
-                {currentUser.roles && currentUser.roles.includes('ROLE_ADMIN') && (
+            )}
+            {user && user.roles && user.roles.includes("ROLE_ADMIN") && (
                   <MobileNavItem 
                     icon={<AdminPanelSettingsIcon />} 
-                    label="Admin Dashboard" 
+                label="Admin Panel" 
                     to="/admin" 
                     onClick={toggleDrawer}
                   />
-                )}
-              </>
             )}
           </List>
-          
           <Divider />
-          
-          {currentUser && (
             <Box sx={{ p: 2 }}>
+            {user ? (
               <Button 
+                fullWidth 
                 variant="outlined" 
                 color="error" 
-                fullWidth 
-                onClick={() => {
-                  toggleDrawer();
-                  logOut();
-                }}
                 startIcon={<LogoutIcon />}
+                onClick={logOut}
               >
                 Logout
               </Button>
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Button 
+                  component={Link} 
+                  to="/login" 
+                  variant="outlined" 
+                  color="primary"
+                  fullWidth
+                  startIcon={<LoginIcon />}
+                  onClick={toggleDrawer}
+                >
+                  Login
+                </Button>
+                <Button 
+                  component={Link} 
+                  to="/register" 
+                  variant="contained" 
+                  color="primary"
+                  fullWidth
+                  startIcon={<PersonAddIcon />}
+                  onClick={toggleDrawer}
+                >
+                  Register
+              </Button>
             </Box>
           )}
+          </Box>
         </Drawer>
 
-        {/* Main Content */}
-        <Box component="main" sx={{ 
-          py: 2,
-          px: { xs: 2, sm: 4 },
-          flexGrow: 1,
-          backgroundColor: theme.palette.background.default
-        }}>
+        {/* Main content */}
+        <Box component="main" sx={{ flexGrow: 1, pt: 2, pb: 8 }}>
           <Container maxWidth="xl">
             <Routes>
-              <Route path="/" element={<ArticleList />} />
+              <Route path="/" element={<Home />} />
+              <Route path="/articles" element={<ArticleList />} />
+              <Route path="/articles/:id" element={<ArticleDetail />} />
+              <Route path="/categories" element={<CategoryList />} />
+              <Route path="/categories/:id" element={<CategoryDetail />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              
+              {/* Protected routes */}
               <Route path="/profile" element={
                 <ProtectedRoute>
                   <Profile />
                 </ProtectedRoute>
               } />
-              <Route path="/articles" element={<ArticleList />} />
-              <Route path="/articles/:id" element={<ArticleDetail />} />
-              <Route path="/add-article" element={
+              <Route path="/article/add" element={
                 <ProtectedRoute>
                   <ArticleForm />
                 </ProtectedRoute>
               } />
-              <Route path="/test-article/:id" element={<TestArticleForm />} />
-              <Route path="/edit-article/:id" element={
+              <Route path="/article/edit/:id" element={
                 <ProtectedRoute>
                   <ArticleForm />
                 </ProtectedRoute>
               } />
-              <Route path="/categories" element={<CategoryList />} />
-              <Route path="/categories/:id" element={<CategoryDetail />} />
               <Route path="/admin" element={
                 <ProtectedRoute roles={["ROLE_ADMIN"]}>
                   <AdminDashboard />
                 </ProtectedRoute>
               } />
-              <Route path="/admin/csv-import" element={
+              <Route path="/admin/import" element={
                 <ProtectedRoute roles={["ROLE_ADMIN"]}>
                   <CsvImporter />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/testform" element={
+                <ProtectedRoute roles={["ROLE_ADMIN"]}>
+                  <TestArticleForm />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/users" element={
+                <ProtectedRoute roles={["ROLE_ADMIN"]}>
+                  <UserManagement />
                 </ProtectedRoute>
               } />
             </Routes>
           </Container>
         </Box>
 
-        {/* Footer */}
+        {/* Modern footer */}
         <Box 
           component="footer" 
           sx={{ 
+            py: 3, 
+            px: 2, 
             mt: 'auto', 
-            py: 2, 
-            backgroundColor: 'background.paper',
+            backgroundColor: theme.palette.mode === 'light' 
+              ? alpha(theme.palette.primary.main, 0.03)
+              : alpha(theme.palette.background.paper, 0.2),
             borderTop: '1px solid',
             borderColor: 'divider'
           }}
         >
           <Container maxWidth="lg">
-            <Box sx={{ 
+            <Box 
+              sx={{ 
               display: 'flex', 
               flexDirection: { xs: 'column', sm: 'row' },
               justifyContent: 'space-between',
-              alignItems: { xs: 'center', sm: 'flex-start' }
-            }}>
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'center', sm: 'flex-start' }, mb: { xs: 2, sm: 0 } }}>
-                <Typography 
-                  variant="h6" 
-                  component="div" 
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center',
-                    color: 'primary.main',
-                    fontWeight: 700,
-                    mb: 1
-                  }}
-                >
-                  <ArticleIcon sx={{ mr: 1 }} />
-                  {appName}
+                alignItems: { xs: 'center', sm: 'flex-start' },
+                textAlign: { xs: 'center', sm: 'left' }
+              }}
+            >
+              <Box sx={{ mb: { xs: 3, sm: 0 } }}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  © 2023 {appName}. All rights reserved.
                 </Typography>
+                <Box sx={{ display: 'flex', gap: 2, justifyContent: { xs: 'center', sm: 'flex-start' } }}>
+                  <Link to="/terms" style={{ textDecoration: 'none' }}>
                 <Typography variant="body2" color="text.secondary">
-                  © {new Date().getFullYear()} {appName}. All rights reserved.
+                      Terms
                 </Typography>
+                  </Link>
+                  <Link to="/privacy" style={{ textDecoration: 'none' }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Privacy
+                  </Typography>
+                </Link>
+                  <Link to="/contact" style={{ textDecoration: 'none' }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Contact
+                  </Typography>
+                </Link>
+                </Box>
               </Box>
-              
-              <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', justifyContent: 'center' }}>
-                <Link to="/articles" style={{ textDecoration: 'none' }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ '&:hover': { color: 'primary.main' } }}>
-                    Articles
+              <Box 
+                sx={{ 
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: { xs: 'center', sm: 'flex-end' }
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <Avatar 
+                    sx={{ 
+                      width: 24, 
+                      height: 24, 
+                      mr: 1,
+                      background: theme.palette.mode === 'dark' 
+                        ? 'linear-gradient(45deg, #4cc9f0, #4361ee)' 
+                        : 'linear-gradient(45deg, #4361ee, #3a0ca3)'
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.6rem' }}>
+                      PC
+                    </Typography>
+                  </Avatar>
+                  <Typography variant="body2" fontWeight={600}>
+                    {appName}
                   </Typography>
-                </Link>
-                <Link to="/categories" style={{ textDecoration: 'none' }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ '&:hover': { color: 'primary.main' } }}>
-                    Categories
-                  </Typography>
-                </Link>
-                <Link to="/profile" style={{ textDecoration: 'none' }}>
-                  <Typography variant="body2" color="text.secondary" sx={{ '&:hover': { color: 'primary.main' } }}>
-                    Profile
-                  </Typography>
-                </Link>
-                <Typography variant="body2" color="text.secondary" sx={{ cursor: 'pointer', '&:hover': { color: 'primary.main' } }}>
-                  Privacy Policy
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ cursor: 'pointer', '&:hover': { color: 'primary.main' } }}>
-                  Terms of Service
+                </Box>
+                <Typography variant="caption" color="text.secondary">
+                  Modern Content Management Platform
                 </Typography>
               </Box>
             </Box>
           </Container>
         </Box>
       </Box>
+      
+      {/* Global backdrop for loading states */}
+      <Backdrop
+        sx={{ 
+          color: '#fff', 
+          zIndex: theme.zIndex.drawer + 2,
+          backdropFilter: 'blur(4px)'
+        }}
+        open={pageLoading}
+      >
+        <CircularProgress color="inherit" />
+      </Backdrop>
     </>
   );
 }

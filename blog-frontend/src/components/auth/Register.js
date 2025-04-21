@@ -1,7 +1,25 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Box, Button, Container, TextField, Typography, Paper, Alert } from '@mui/material';
+import { useNavigate, Link } from 'react-router-dom';
+import { 
+  Box, 
+  Button, 
+  Container, 
+  TextField, 
+  Typography, 
+  Paper, 
+  Alert, 
+  Avatar, 
+  Fade, 
+  CircularProgress, 
+  Card, 
+  Stack, 
+  useTheme,
+  alpha
+} from '@mui/material';
 import AuthService from '../../services/auth.service';
+import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 const Register = () => {
   const [username, setUsername] = useState('');
@@ -11,6 +29,7 @@ const Register = () => {
   const [message, setMessage] = useState('');
   const [successful, setSuccessful] = useState(false);
   const navigate = useNavigate();
+  const theme = useTheme();
 
   const handleRegister = (e) => {
     e.preventDefault();
@@ -26,7 +45,7 @@ const Register = () => {
 
     AuthService.register(username, email, password).then(
       (response) => {
-        setMessage(response.data.message);
+        setMessage(response.data.message || 'Registration successful! Redirecting to login...');
         setSuccessful(true);
         setLoading(false);
         setTimeout(() => {
@@ -49,68 +68,183 @@ const Register = () => {
   };
 
   return (
-    <Container maxWidth="sm">
-      <Box sx={{ mt: 8, mb: 4 }}>
-        <Paper elevation={3} sx={{ p: 4 }}>
-          <Typography component="h1" variant="h5" align="center" gutterBottom>
-            Register
-          </Typography>
-
-          {message && (
-            <Alert severity={successful ? "success" : "error"} sx={{ mb: 2 }}>
-              {message}
-            </Alert>
-          )}
-
-          <Box component="form" onSubmit={handleRegister} sx={{ mt: 1 }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="username"
-              label="Username"
-              name="username"
-              autoComplete="username"
-              autoFocus
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="email"
-              label="Email Address"
-              name="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type="password"
-              id="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              sx={{ mt: 3, mb: 2 }}
-              disabled={loading}
+    <Box 
+      sx={{ 
+        minHeight: 'calc(100vh - 140px)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        py: 6,
+        px: 2
+      }}
+    >
+      <Container maxWidth="sm">
+        <Fade in={true} timeout={800}>
+          <Card
+            elevation={0}
+            variant="outlined"
+            sx={{
+              borderRadius: 3,
+              p: { xs: 3, sm: 5 },
+              boxShadow: '0 10px 40px rgba(0,0,0,0.05)',
+              overflow: 'visible'
+            }}
+          >
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                mb: 4,
+                position: 'relative'
+              }}
             >
-              {loading ? 'Registering...' : 'Register'}
-            </Button>
-          </Box>
-        </Paper>
-      </Box>
-    </Container>
+              <Avatar
+                sx={{
+                  mb: 2,
+                  width: 66,
+                  height: 66,
+                  backgroundColor: 'secondary.main',
+                  boxShadow: '0 8px 16px rgba(247, 37, 133, 0.2)',
+                  transform: 'translateY(-50%)',
+                  position: 'absolute',
+                  top: 0
+                }}
+              >
+                <PersonAddAltIcon fontSize="large" />
+              </Avatar>
+              
+              <Box sx={{ mt: 4 }}>
+                <Typography 
+                  variant="h4" 
+                  component="h1" 
+                  align="center" 
+                  sx={{ 
+                    fontWeight: 700,
+                    mb: 1
+                  }}
+                >
+                  Create Account
+                </Typography>
+                <Typography 
+                  variant="body1" 
+                  align="center" 
+                  color="text.secondary"
+                  sx={{ mb: 3 }}
+                >
+                  Sign up to get started with ProContent
+                </Typography>
+              </Box>
+            </Box>
+
+            {message && (
+              <Alert 
+                severity={successful ? "success" : "error"} 
+                icon={successful ? <CheckCircleOutlineIcon fontSize="inherit" /> : <ErrorOutlineIcon fontSize="inherit" />}
+                sx={{ 
+                  mb: 3, 
+                  borderRadius: 2,
+                  boxShadow: successful 
+                    ? '0 4px 12px rgba(16, 185, 129, 0.1)' 
+                    : '0 4px 12px rgba(239, 68, 68, 0.1)'
+                }}
+              >
+                {message}
+              </Alert>
+            )}
+
+            <form onSubmit={handleRegister}>
+              <Stack spacing={3}>
+                <TextField
+                  fullWidth
+                  label="Username"
+                  name="username"
+                  variant="outlined"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  autoFocus
+                  disabled={successful}
+                  InputProps={{
+                    sx: { borderRadius: 2 }
+                  }}
+                />
+                <TextField
+                  fullWidth
+                  label="Email Address"
+                  name="email"
+                  variant="outlined"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={successful}
+                  InputProps={{
+                    sx: { borderRadius: 2 }
+                  }}
+                />
+                <TextField
+                  fullWidth
+                  label="Password"
+                  name="password"
+                  variant="outlined"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={successful}
+                  InputProps={{
+                    sx: { borderRadius: 2 }
+                  }}
+                />
+
+                <Button
+                  type="submit"
+                  fullWidth
+                  variant="contained"
+                  color="secondary"
+                  size="large"
+                  disabled={loading || successful}
+                  sx={{ 
+                    mt: 3, 
+                    py: 1.5, 
+                    position: 'relative',
+                    borderRadius: 2,
+                    fontWeight: 600
+                  }}
+                >
+                  {loading ? (
+                    <CircularProgress 
+                      size={24} 
+                      color="inherit" 
+                      sx={{ position: 'absolute' }} 
+                    />
+                  ) : (
+                    'Sign Up'
+                  )}
+                </Button>
+              </Stack>
+            </form>
+
+            <Box sx={{ mt: 4, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                Already have an account?{' '}
+                <Link 
+                  to="/login" 
+                  style={{ 
+                    color: theme.palette.primary.main,
+                    textDecoration: 'none',
+                    fontWeight: 600
+                  }}
+                >
+                  Sign In
+                </Link>
+              </Typography>
+            </Box>
+          </Card>
+        </Fade>
+      </Container>
+    </Box>
   );
 };
 

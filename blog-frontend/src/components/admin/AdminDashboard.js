@@ -53,7 +53,8 @@ import {
   Error as ErrorIcon,
   Bookmark as BookmarkIcon,
   Visibility as VisibilityIcon,
-  FormatListBulleted as FormatListBulletedIcon
+  FormatListBulleted as FormatListBulletedIcon,
+  People as PeopleIcon
 } from '@mui/icons-material';
 import { getArticlesPaginated, getCategories, deleteArticle } from '../../services/api';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -418,6 +419,15 @@ const AdminDashboard = () => {
           >
             Import CSV
           </Button>
+          <Button
+            variant="contained"
+            color="info"
+            startIcon={<PeopleIcon />}
+            component={RouterLink}
+            to="/admin/users"
+          >
+            User Management
+          </Button>
         </Box>
       </Box>
 
@@ -617,8 +627,9 @@ const AdminDashboard = () => {
                       </Tooltip>
                       <Tooltip title="Edit Article">
                         <IconButton
+                          color="primary"
                           component={RouterLink}
-                          to={`/edit-article/${article.id}`}
+                          to={`/article/edit/${article.id}`}
                           size="small"
                         >
                           <EditIcon fontSize="small" />

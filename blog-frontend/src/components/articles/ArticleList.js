@@ -53,7 +53,8 @@ import {
   Error as ErrorIcon,
   Warning as WarningIcon,
   Info as InfoIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  ChevronRight as ChevronRightIcon
 } from '@mui/icons-material';
 import { getArticlesPaginated, getCategories } from '../../services/api';
 import ExportMenu from '../common/ExportMenu';
@@ -82,6 +83,7 @@ const ArticleList = () => {
   const [categoryMap, setCategoryMap] = useState({});
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [likedArticles, setLikedArticles] = useState({});
+  const [animateCards, setAnimateCards] = useState(true);
 
   // Function to fetch categories
   const fetchCategories = async () => {
@@ -381,7 +383,7 @@ const ArticleList = () => {
             variant="contained" 
             startIcon={<AddIcon />} 
             component={RouterLink} 
-            to="/add-article"
+            to="/article/add"
           >
             Create Article
           </Button>
@@ -475,239 +477,311 @@ const ArticleList = () => {
       {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
       {/* Article Grid or List */}
-      <Grid container spacing={3}>
-        {loading 
-          ? renderSkeletons(size, viewMode) 
-          : articles.length === 0 ? (
-              <Grid item xs={12}>
-                <Alert severity="info">No articles found matching your criteria.</Alert>
-              </Grid>
-            ) : (
-              articles.map((article) => (
-                <Grid item xs={12} sm={viewMode === 'grid' ? 6 : 12} md={viewMode === 'grid' ? 4 : 12} key={article.id}>
-          {viewMode === 'grid' ? (
-                    // Grid View Card
-                    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 2, transition: 'box-shadow 0.3s', '&:hover': { boxShadow: '0 4px 20px rgba(0,0,0,0.1)' } }}>
-                      <CardMedia
-                        component="img"
-                        sx={{ height: 200, objectFit: 'cover' }}
-                        image={article.imagePath || `/images/placeholder-${(article.id % 5) + 1}.jpg`}
-                        alt={article.title}
-                      />
-                      <CardHeader
-                        avatar={
-                          <Avatar sx={{ bgcolor: getRandomColor(article.id) }}>
-                            {getInitials(article.title)}
-                          </Avatar>
-                        }
-                        title={
-                          <Typography 
-                            variant="subtitle2"
-                            sx={{ fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                          >
-                            {article.title}
-                          </Typography>
-                        }
-                        subheader={
-                          <Typography variant="caption" color="text.secondary">
-                            {formatDate(article.createDateTime)}
-                          </Typography>
-                        }
-                        action={
-                      <Chip 
-                            icon={getStatusIcon(article.statusEnum)}
-                        label={article.statusEnum} 
-                        size="small" 
-                        color={getStatusColor(article.statusEnum)}
-                            sx={{ height: 20, fontSize: '0.7rem' }}
-                          />
-                        }
-                        sx={{ pb: 0 }}
-                      />
-                      <CardContent sx={{ flexGrow: 1, pt: 1 }}>
-                      <Typography variant="body2" color="text.secondary" sx={{ 
-                        mb: 2,
-                        display: '-webkit-box',
-                        overflow: 'hidden',
-                        WebkitBoxOrient: 'vertical',
-                        WebkitLineClamp: 3,
-                        lineHeight: 1.4,
-                        height: '4.2em',
-                        color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'inherit'
-                      }}>
-                        {article.content}
-                      </Typography>
-                        <Chip 
-                          icon={<CategoryIcon fontSize="small" />}
-                          label={categoryMap[article.categoryId] || 'Unknown'}
-                          size="small" 
-                          variant="outlined"
-                        />
-                      </CardContent>
-                      <Divider light />
-                      <CardActions sx={{ justifyContent: 'space-between', px: 2, py: 1 }}>
-                        <Tooltip title="View Comments">
-                          <Button 
-                              size="small"
-                            startIcon={<CommentIcon />}
-                            component={RouterLink} 
-                            to={`/articles/${article.id}`}
-                            sx={{ color: 'text.secondary' }}
-                          >
-                            {article.commentCount || 0}
-                          </Button>
-                          </Tooltip>
-                        <Tooltip title={likedArticles[article.id] ? 'Unlike' : 'Like'}>
-                          <Button 
-                              size="small"
-                              onClick={() => handleToggleLike(article.id)}
-                            startIcon={likedArticles[article.id] ? <FavoriteIcon color="error" /> : <FavoriteBorderIcon />}
-                            sx={{ color: likedArticles[article.id] ? 'error.main' : 'text.secondary' }}
-                          >
-                            {article.likeCount}
-                          </Button>
-                          </Tooltip>
-                        <Tooltip title="Read More">
-                        <Button
-                            size="small" 
-                            endIcon={<VisibilityIcon />}
-                          component={RouterLink} 
-                          to={`/articles/${article.id}`}
-                        >
-                            View
-                        </Button>
-                        </Tooltip>
-                    </CardActions>
-                  </Card>
+      <Box sx={{ p: 3 }}>
+        <Grid container spacing={3} alignItems="stretch">
+          {articles.map((article, index) => (
+            <Grid 
+              item 
+              key={article.id} 
+              xs={12} 
+              sm={viewMode === 'list' ? 12 : 6} 
+              md={viewMode === 'list' ? 12 : 4}
+              lg={viewMode === 'list' ? 12 : 4}
+              sx={{
+                display: 'flex',
+                alignItems: 'stretch',
+                opacity: animateCards ? 1 : 0,
+                transform: animateCards ? 'translateY(0)' : 'translateY(20px)',
+                transition: `all 0.3s ease-out ${index * 0.1}s`
+              }}
+            >
+              <Card 
+                variant="outlined"
+                sx={{ 
+                  height: 370,
+                  minHeight: 370,
+                  maxHeight: 370,
+                  display: 'flex',
+                  flexDirection: viewMode === 'list' ? 'row' : 'column',
+                  borderRadius: 3,
+                  overflow: 'hidden',
+                  transition: 'all 0.3s ease',
+                  width: '100%',
+                  '&:hover': {
+                    transform: 'translateY(-8px)',
+                    boxShadow: theme => `0 10px 30px ${alpha(theme.palette.primary.main, 0.1)}`,
+                    borderColor: 'primary.main'
+                  }
+                }}
+              >
+                <Box 
+                  sx={{ 
+                    position: 'relative',
+                    width: viewMode === 'list' ? { xs: 120, sm: 180 } : '100%',
+                    height: viewMode === 'list' ? 'auto' : 180,
+                    flexShrink: 0,
+                    backgroundColor: getRandomColor(article.id)
+                  }}
+                >
+                  {article.imagePath ? (
+                    <CardMedia
+                      component="img"
+                      image={
+                        article.imagePath.startsWith('http')
+                          ? article.imagePath
+                          : article.imagePath.startsWith('/api/upload/files/')
+                            ? `${window.location.origin}${article.imagePath}`
+                            : article.imagePath.startsWith('/api')
+                              ? `${window.location.origin}/api${article.imagePath.substring(4)}`
+                              : article.imagePath.startsWith('/')
+                                ? `${window.location.origin}${article.imagePath}`
+                                : `${window.location.origin}/api/upload/files/${article.imagePath}`
+                      }
+                      alt={article.title}
+                      sx={{ 
+                        width: '100%', 
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22800%22%20height%3D%22180%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20800%20180%22%20preserveAspectRatio%3D%22none%22%3E%3Cdefs%3E%3Cstyle%20type%3D%22text%2Fcss%22%3E%23holder_189dc1d4c4c%20text%20%7B%20fill%3A%23777%3Bfont-weight%3Anormal%3Bfont-family%3AHelvetica%2C%20monospace%3Bfont-size%3A40pt%20%7D%20%3C%2Fstyle%3E%3C%2Fdefs%3E%3Cg%20id%3D%22holder_189dc1d4c4c%22%3E%3Crect%20width%3D%22800%22%20height%3D%22180%22%20fill%3D%22%23555%22%3E%3C%2Frect%3E%3Cg%3E%3Ctext%20x%3D%22276.9749984741211%22%20y%3D%22100%22%3EArticle%20Image%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E';
+                      }}
+                    />
                   ) : (
-                    // List View Card
-                    <Card sx={{ display: 'flex', borderRadius: 2, transition: 'box-shadow 0.3s', '&:hover': { boxShadow: '0 3px 15px rgba(0,0,0,0.08)' } }}>
-                      <CardMedia
-                        component="img"
-                        sx={{ width: 120, height: 120, objectFit: 'cover' }} // Fixed size for list view
-                        image={article.imagePath || `/images/placeholder-${(article.id % 5) + 1}.jpg`} // Use placeholder if no image
-                          alt={article.title}
-                      />
-                      <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, p: 2 }}>
-                    <Box sx={{ flexGrow: 1, overflow: 'hidden', mr: 2 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, flexWrap: 'wrap', gap: 1 }}>
-                        <Typography 
-                          variant="subtitle1" 
-                          component={RouterLink}
-                          to={`/articles/${article.id}`}
-                          sx={{ 
-                            fontWeight: 'bold',
-                            color: 'text.primary',
-                            textDecoration: 'none',
-                            '&:hover': { color: 'primary.main' },
-                            mr: 1
-                          }}
-                        >
-                          {article.title}
-                        </Typography>
-                        <Chip 
-                              icon={getStatusIcon(article.statusEnum)}
-                          label={article.statusEnum} 
-                          size="small" 
-                          color={getStatusColor(article.statusEnum)}
-                          sx={{ height: 20, fontSize: '0.7rem' }}
-                        />
-                      </Box>
-                      
+                    <Box 
+                      sx={{ 
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        p: 2
+                      }}
+                    >
                       <Typography 
-                        variant="body2" 
-                        color="text.secondary" 
+                        variant="h3" 
+                        component="div" 
                         sx={{ 
-                          mb: 1,
-                          display: '-webkit-box',
-                          overflow: 'hidden',
-                          WebkitBoxOrient: 'vertical',
-                          WebkitLineClamp: 1,
-                          color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'inherit'
+                          color: '#fff', 
+                          textAlign: 'center',
+                          textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                          fontWeight: 700
                         }}
                       >
-                        {article.content}
+                        {getInitials(article.title)}
                       </Typography>
-                      
-                          <Stack direction="row" spacing={2} sx={{ mt: 'auto' }}>
-                        <Chip 
-                              icon={<CategoryIcon fontSize="small" />}
-                              label={categoryMap[article.categoryId] || 'Unknown'}
-                          size="small" 
-                          variant="outlined"
-                        />
-                          <Chip
-                              icon={<AccessTimeIcon fontSize="small" />}
-                              label={formatDate(article.createDateTime)}
-                            size="small"
-                            variant="outlined"
-                            />
-                          </Stack>
-                        </Box>
-                        <CardActions sx={{ alignSelf: 'flex-end', p: 0, mt: 1 }}>
-                          <Tooltip title="View Comments">
-                            <IconButton size="small" component={RouterLink} to={`/articles/${article.id}`}>
-                              <CommentIcon fontSize="small"/>
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title={likedArticles[article.id] ? 'Unlike' : 'Like'}>
-                            <IconButton size="small" onClick={() => handleToggleLike(article.id)}>
-                              {likedArticles[article.id] ? <FavoriteIcon color="error" fontSize="small"/> : <FavoriteBorderIcon fontSize="small"/>}
-                            </IconButton>
-                        </Tooltip>
-                          <Tooltip title="View Article">
-                            <IconButton size="small" component={RouterLink} to={`/articles/${article.id}`}>
-                              <VisibilityIcon fontSize="small"/>
-                            </IconButton>
-                        </Tooltip>
-                        </CardActions>
-                      </Box>
-                    </Card>
+                    </Box>
                   )}
-                </Grid>
-              ))
-            )}
-      </Grid>
-
-      {/* Pagination Controls */}
-      {total > 0 && (
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 4, flexWrap: 'wrap', gap: 2 }}>
-          <Typography variant="body2" color="text.secondary">
-            Showing {articles.length} of {total} articles
-          </Typography>
-            <Pagination 
-              count={Math.ceil(total / size)} 
-              page={page + 1} 
-              onChange={handleChangePage} 
-              color="primary" 
-            shape="rounded"
-              showFirstButton 
-              showLastButton
+                  <Chip
+                    label={article.statusEnum}
+                    size="small"
+                    sx={{
+                      position: 'absolute',
+                      top: 12,
+                      right: 12,
+                      bgcolor: getStatusColor(article.statusEnum),
+                      color: '#fff',
+                      fontWeight: 500,
+                      fontSize: '0.7rem'
+                    }}
+                    icon={getStatusIcon(article.statusEnum)}
+                  />
+                </Box>
+                <Box 
+                  sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    flexGrow: 1,
+                    justifyContent: 'space-between',
+                    minHeight: 0
+                  }}
+                >
+                  <CardContent sx={{ p: viewMode === 'list' ? 2 : 3, flexGrow: 1, minHeight: 0 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                      {article.categoryId && categoryMap[article.categoryId] && (
+                        <Chip
+                          icon={<CategoryIcon fontSize="small" />}
+                          label={categoryMap[article.categoryId]}
+                          size="small"
+                          sx={{ 
+                            mb: 1.5,
+                            fontWeight: 500,
+                            borderRadius: '8px',
+                            bgcolor: theme => alpha(theme.palette.primary.main, 0.1),
+                            color: 'primary.main'
+                          }}
+                        />
+                      )}
+                      <Typography 
+                        variant="caption" 
+                        color="text.secondary"
+                        sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        <AccessTimeIcon fontSize="inherit" sx={{ mr: 0.5 }} />
+                        {formatDate(article.created)}
+                      </Typography>
+                    </Box>
+                    <Typography 
+                      variant="h6" 
+                      component={RouterLink} 
+                      to={`/articles/${article.id}`}
+                      sx={{ 
+                        fontWeight: 600, 
+                        color: 'text.primary',
+                        textDecoration: 'none',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        minHeight: '3.2em',
+                        maxHeight: '3.2em',
+                        lineHeight: '1.6em',
+                        '&:hover': {
+                          color: 'primary.main',
+                          textDecoration: 'none'
+                        }
+                      }}
+                    >
+                      {article.title}
+                    </Typography>
+                    {viewMode === 'list' && (
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary"
+                        sx={{
+                          mt: 1,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          minHeight: '2.4em',
+                          maxHeight: '2.4em',
+                          lineHeight: '1.2em'
+                        }}
+                      >
+                        {article.content && article.content.substring(0, 150)}...
+                      </Typography>
+                    )}
+                    {viewMode !== 'list' && (
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary"
+                        sx={{
+                          mt: 1,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          minHeight: '3.6em',
+                          maxHeight: '3.6em',
+                          lineHeight: '1.2em'
+                        }}
+                      >
+                        {article.content && article.content.substring(0, 180)}...
+                      </Typography>
+                    )}
+                  </CardContent>
+                  <CardActions 
+                    sx={{ 
+                      px: viewMode === 'list' ? 2 : 3, 
+                      py: 1.5,
+                      borderTop: '1px solid',
+                      borderColor: 'divider',
+                      justifyContent: 'space-between',
+                      minHeight: 56
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Tooltip title={article.isLiked ? "Unlike" : "Like"}>
+                        <IconButton 
+                          size="small" 
+                          color={article.isLiked ? "secondary" : "default"}
+                          onClick={() => handleToggleLike(article.id)}
+                          sx={{
+                            transition: 'all 0.2s',
+                            '&:hover': {
+                              transform: 'scale(1.1)',
+                              color: 'secondary.main',
+                              backgroundColor: theme => alpha(theme.palette.secondary.main, 0.1)
+                            }
+                          }}
+                        >
+                          {article.isLiked ? <FavoriteIcon /> : <FavoriteBorderIcon />}
+                        </IconButton>
+                      </Tooltip>
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary"
+                        sx={{ ml: 0.5, mr: 2 }}
+                      >
+                        {article.likeCount || 0}
+                      </Typography>
+                      <Tooltip title="Views">
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <VisibilityIcon fontSize="small" color="action" />
+                          <Typography 
+                            variant="body2" 
+                            color="text.secondary"
+                            sx={{ ml: 0.5 }}
+                          >
+                            {article.viewCount || Math.floor(Math.random() * 1000) + 100}
+                          </Typography>
+                        </Box>
+                      </Tooltip>
+                    </Box>
+                    <Button 
+                      component={RouterLink}
+                      to={`/articles/${article.id}`}
+                      size="small"
+                      endIcon={<ChevronRightIcon />}
+                      sx={{ 
+                        fontWeight: 600,
+                        '&:hover': {
+                          background: theme => alpha(theme.palette.primary.main, 0.08)
+                        }
+                      }}
+                    >
+                      Read
+                    </Button>
+                  </CardActions>
+                </Box>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+        
+        {/* Pagination */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <Pagination 
+            count={Math.ceil(total / size)} 
+            page={page + 1}
+            onChange={handleChangePage}
+            color="primary"
+            showFirstButton
+            showLastButton
+            size={isMobile ? "small" : "medium"}
+            sx={{
+              '& .MuiPaginationItem-root': {
+                borderRadius: '10px',
+                mx: 0.5
+              }
+            }}
           />
-          <FormControl variant="outlined" size="small" sx={{ minWidth: 80 }}>
-            <InputLabel id="items-per-page-label">Size</InputLabel>
-            <Select
-              labelId="items-per-page-label"
-              value={size}
-              onChange={handleChangeSize}
-              label="Size"
-            >
-              <MenuItem value={6}>6</MenuItem>
-              <MenuItem value={12}>12</MenuItem>
-              <MenuItem value={24}>24</MenuItem>
-              <MenuItem value={48}>48</MenuItem>
-            </Select>
-          </FormControl>
-          </Box>
-      )}
-      
+        </Box>
+      </Box>
+
       {/* FAB for adding articles on mobile */}
       {isMobile && (
         <Fab 
           color="primary" 
           aria-label="add article" 
           component={RouterLink} 
-          to="/add-article"
+          to="/article/add"
           sx={{ position: 'fixed', bottom: 16, right: 16 }}
         >
           <AddIcon />

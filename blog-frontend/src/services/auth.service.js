@@ -163,6 +163,10 @@ class AuthService {
   isAdmin() {
     return this.hasRole('ROLE_ADMIN');
   }
+
+  resetPasswordWithMfa(username, mfaCode, newPassword) {
+    return axios.post(API_URL + 'reset-password-mfa', { username, mfaCode, newPassword });
+  }
 }
 
 export default new AuthService(); 

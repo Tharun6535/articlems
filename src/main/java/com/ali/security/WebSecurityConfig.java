@@ -100,6 +100,8 @@ public class WebSecurityConfig {
                     // Swagger
                     .requestMatchers(new AntPathRequestMatcher("/swagger-ui/**")).permitAll()
                     .requestMatchers(new AntPathRequestMatcher("/v3/api-docs/**")).permitAll()
+                    // Public user info for forgot password
+                    .requestMatchers(new AntPathRequestMatcher("/api/public/user/**")).permitAll()
                     // Secured endpoints
                     .requestMatchers(new AntPathRequestMatcher("/api/articles/**")).authenticated()
                     .requestMatchers(new AntPathRequestMatcher("/api/comments/**")).authenticated()

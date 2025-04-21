@@ -55,6 +55,33 @@ class UserService {
       withCredentials: true 
     });
   }
+
+  // Admin user management
+  getAllUsers() {
+    return axios.get('http://localhost:8081/api/admin/users', {
+      headers: authHeader(),
+      withCredentials: true
+    });
+  }
+
+  updateUser(id, user) {
+    return axios.put(`http://localhost:8081/api/admin/users/${id}`, user, {
+      headers: authHeader(),
+      withCredentials: true
+    });
+  }
+
+  deleteUser(id) {
+    return axios.delete(`http://localhost:8081/api/admin/users/${id}`, {
+      headers: authHeader(),
+      withCredentials: true
+    });
+  }
+
+  // Public user info by username (for forgot password flow)
+  getPublicUserByUsername(username) {
+    return axios.get(`http://localhost:8081/api/public/user/${encodeURIComponent(username)}`);
+  }
 }
 
 export default new UserService(); 

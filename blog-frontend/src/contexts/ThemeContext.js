@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useMemo } from 'react';
-import { ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material';
+import { ThemeProvider as MuiThemeProvider } from '@mui/material';
 import CssBaseline from '@mui/material/CssBaseline';
+import { getTheme } from '../theme';
 
 // Create the context
 export const ThemeContext = createContext({
@@ -13,7 +14,13 @@ export const ThemeProvider = ({ children }) => {
   // Check if dark mode preference exists in localStorage, default to light
   const [mode, setMode] = useState(() => {
     const savedMode = localStorage.getItem('themeMode');
-    return savedMode || 'light';
+    // Also check system preference if no saved preference
+    if (!savedMode) {
+      const prefersDarkMode = window.matchMedia && 
+        window.matchMedia('(prefers-color-scheme: dark)').matches;
+      return prefersDarkMode ? 'dark' : 'light';
+    }
+    return savedMode;
   });
 
   // Toggle between light and dark mode
@@ -25,25 +32,37 @@ export const ThemeProvider = ({ children }) => {
     });
   };
 
+  // Listen for system preference changes
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => {
+      // Only change if user hasn't set a preference
+      if (!localStorage.getItem('themeMode')) {
+        setMode(e.matches ? 'dark' : 'light');
+      }
+    };
+    
+    // Add listener
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+    } else {
+      // For older browsers
+      mediaQuery.addListener(handleChange);
+    }
+    
+    // Clean up
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', handleChange);
+      } else {
+        // For older browsers
+        mediaQuery.removeListener(handleChange);
+      }
+    };
+  }, []);
+
   // Create the theme object based on current mode
-  const theme = useMemo(() => 
-    createTheme({
-      palette: {
-        mode,
-        primary: {
-          main: mode === 'light' ? '#1976d2' : '#90caf9',
-        },
-        secondary: {
-          main: mode === 'light' ? '#9c27b0' : '#ce93d8',
-        },
-        background: {
-          default: mode === 'light' ? '#f5f5f5' : '#121212',
-          paper: mode === 'light' ? '#ffffff' : '#1e1e1e',
-        },
-      },
-    }),
-    [mode]
-  );
+  const theme = useMemo(() => getTheme(mode), [mode]);
 
   // Context value with mode state and toggle function
   const contextValue = useMemo(() => ({

@@ -15,13 +15,26 @@ import {
   InputAdornment,
   IconButton,
   Divider,
-  useTheme
+  useTheme,
+  Avatar,
+  Grid,
+  Fade,
+  CircularProgress,
+  alpha,
+  Card,
+  Stack
 } from '@mui/material';
 import { useAuth } from '../../context/AuthContext';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import ArticleIcon from '@mui/icons-material/Article';
+import LoginIcon from '@mui/icons-material/Login';
+import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+import SecurityIcon from '@mui/icons-material/Security';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import AuthService from '../../services/auth.service';
+import UserService from '../../services/user.service';
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -35,6 +48,16 @@ const Login = () => {
   const [mfaCode, setMfaCode] = useState('');
   const [mfaError, setMfaError] = useState('');
   const [currentMfaUsername, setCurrentMfaUsername] = useState('');
+  
+  // Remove email-based reset states
+  // Add TOTP-based reset states
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [resetUsername, setResetUsername] = useState('');
+  const [resetMfaCode, setResetMfaCode] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetMessage, setResetMessage] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMfaEnabled, setResetMfaEnabled] = useState(null); // null=not checked, true/false=checked
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -145,305 +168,407 @@ const Login = () => {
     setShowPassword(!showPassword);
   };
 
+  const handleOpenResetDialog = () => {
+    setShowResetDialog(true);
+    setResetUsername('');
+    setResetMfaCode('');
+    setResetNewPassword('');
+    setResetMessage('');
+  };
+
+  const handleCloseResetDialog = () => {
+    setShowResetDialog(false);
+    setResetUsername('');
+    setResetMfaCode('');
+    setResetNewPassword('');
+    setResetMessage('');
+    setResetLoading(false);
+  };
+
+  const handleResetUsernameBlur = async () => {
+    if (!resetUsername) {
+      setResetMfaEnabled(null);
+      return;
+    }
+    setResetMfaEnabled(null);
+    setResetMessage('');
+    try {
+      const res = await UserService.getPublicUserByUsername(resetUsername);
+      if (res.data && typeof res.data.mfaEnabled !== 'undefined') {
+        setResetMfaEnabled(res.data.mfaEnabled);
+        if (!res.data.mfaEnabled) {
+          setResetMessage('This user does not have MFA enabled. Please contact the administrator to reset your password.');
+        } else {
+          setResetMessage('');
+        }
+      } else {
+        setResetMfaEnabled(null);
+        setResetMessage('User not found.');
+      }
+    } catch (err) {
+      setResetMfaEnabled(null);
+      setResetMessage('User not found.');
+    }
+  };
+
+  const handleRequestReset = async () => {
+    if (!resetUsername) {
+      setResetMessage('Username is required.');
+      return;
+    }
+    if (resetMfaEnabled === false) {
+      setResetMessage('This user does not have MFA enabled. Please contact the administrator.');
+      return;
+    }
+    if (!resetMfaCode || !resetNewPassword) {
+      setResetMessage('All fields are required.');
+      return;
+    }
+    setResetLoading(true);
+    setResetMessage('');
+    try {
+      await AuthService.resetPasswordWithMfa(resetUsername, resetMfaCode, resetNewPassword);
+      setResetMessage('Password reset successful. You can now log in.');
+    } catch (err) {
+      setResetMessage(
+        err.response?.data?.message || 'Error resetting password.'
+      );
+    }
+    setResetLoading(false);
+  };
+
   return (
     <Box 
       sx={{ 
-        minHeight: '100vh',
+        minHeight: 'calc(100vh - 140px)',
         display: 'flex',
-        flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        py: 8,
-        backgroundColor: '#fafafa'
+        py: 6,
+        px: 2
       }}
     >
       <Container maxWidth="sm">
-        <Box 
-          sx={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center',
-            mb: 3
-          }}
-        >
-          <ArticleIcon 
-            color="secondary" 
-            sx={{ 
-              fontSize: 48, 
-              mb: 2,
-              transform: 'rotate(-5deg)'
-            }} 
-          />
-          <Typography 
-            component="h1" 
-            variant="h3" 
-            align="center" 
-            sx={{ 
-              fontWeight: 700,
-              letterSpacing: '-0.5px',
-              mb: 1
+        <Fade in={true} timeout={800}>
+          <Card
+            elevation={0}
+            variant="outlined"
+            sx={{
+              borderRadius: 3,
+              p: { xs: 3, sm: 5 },
+              boxShadow: '0 10px 40px rgba(0,0,0,0.05)',
+              overflow: 'visible'
             }}
           >
-            Welcome Back
-          </Typography>
-          <Typography 
-            component="p" 
-            variant="subtitle1" 
-            align="center" 
-            color="text.secondary"
-            sx={{ maxWidth: 400, mb: 4 }}
-          >
-            Sign in to continue to your account
-          </Typography>
-        </Box>
-
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            p: 4, 
-            borderRadius: 2,
-            border: '1px solid',
-            borderColor: 'divider',
-            bgcolor: 'background.paper',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-          }}
-        >
-          {message && (
-            <Alert 
-              severity="error" 
+            <Box 
               sx={{ 
-                mb: 3,
-                borderRadius: 1,
-                '& .MuiAlert-icon': {
-                  alignItems: 'center'
-                }
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                mb: 4,
+                position: 'relative'
               }}
-              variant="outlined"
             >
-              {message}
-            </Alert>
-          )}
-
-          <Box component="form" onSubmit={handleLogin} sx={{ mt: 1 }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="username"
-              label="Username"
-              name="username"
-              autoComplete="username"
-              autoFocus
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              sx={{
-                mb: 3,
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 1,
-                  '&:hover fieldset': {
-                    borderColor: 'secondary.main',
-                  },
-                },
-                '& .MuiInputLabel-root.Mui-focused': {
-                  color: 'secondary.main',
-                }
-              }}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type={showPassword ? 'text' : 'password'}
-              id="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      aria-label="toggle password visibility"
-                      onClick={handleTogglePasswordVisibility}
-                      edge="end"
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-              sx={{
-                mb: 3,
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 1,
-                  '&:hover fieldset': {
-                    borderColor: 'secondary.main',
-                  },
-                },
-                '& .MuiInputLabel-root.Mui-focused': {
-                  color: 'secondary.main',
-                }
-              }}
-            />
-            
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              color="secondary"
-              size="large"
-              sx={{ 
-                mt: 2, 
-                mb: 3,
-                py: 1.5,
-                fontWeight: 600,
-                boxShadow: 'none',
-                fontSize: '1rem',
-                '&:hover': {
-                  boxShadow: '0 6px 20px rgba(3, 168, 124, 0.23)',
-                  transform: 'translateY(-1px)'
-                }
-              }}
-              disabled={loading}
-            >
-              {loading ? 'Signing in...' : 'Sign In'}
-            </Button>
-            
-            <Divider sx={{ my: 3 }}>
-              <Typography variant="body2" color="text.secondary">
-                or
-              </Typography>
-            </Divider>
-            
-            <Box sx={{ textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Don't have an account?
-              </Typography>
-              <Button
-                component={Link}
-                to="/register"
-                variant="outlined"
-                sx={{ 
-                  px: 4,
-                  '&:hover': {
-                    backgroundColor: 'rgba(3, 168, 124, 0.04)'
-                  }
+              <Avatar
+                sx={{
+                  mb: 2,
+                  width: 66,
+                  height: 66,
+                  backgroundColor: 'primary.main',
+                  boxShadow: '0 8px 16px rgba(67, 97, 238, 0.2)',
+                  transform: 'translateY(-50%)',
+                  position: 'absolute',
+                  top: 0
                 }}
               >
-                Create Account
+                <LoginIcon fontSize="large" />
+              </Avatar>
+              
+              <Box sx={{ mt: 4 }}>
+                <Typography 
+                  variant="h4" 
+                  component="h1" 
+                  align="center" 
+                  sx={{ 
+                    fontWeight: 700,
+                    mb: 1
+                  }}
+                >
+                  Welcome Back
+                </Typography>
+                <Typography 
+                  variant="body1" 
+                  align="center" 
+                  color="text.secondary"
+                  sx={{ mb: 3 }}
+                >
+                  Sign in to your account to continue
+                </Typography>
+              </Box>
+            </Box>
+            
+            {message && (
+              <Alert 
+                severity="error" 
+                icon={<ErrorOutlineIcon fontSize="inherit" />}
+                sx={{ 
+                  mb: 3, 
+                  borderRadius: 2,
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.1)'
+                }}
+              >
+                {message}
+              </Alert>
+            )}
+
+            <form onSubmit={handleLogin}>
+              <Stack spacing={3}>
+                <TextField
+                  fullWidth
+                  label="Username"
+                  name="username"
+                  variant="outlined"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  autoFocus
+                  InputProps={{
+                    sx: { borderRadius: 2 }
+                  }}
+                />
+                <TextField
+                  fullWidth
+                  label="Password"
+                  name="password"
+                  variant="outlined"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          onClick={handleTogglePasswordVisibility}
+                          edge="end"
+                        >
+                          {showPassword ? <VisibilityOff /> : <Visibility />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                    sx: { borderRadius: 2 }
+                  }}
+                />
+
+                <Button
+                  type="submit"
+                  fullWidth
+                  variant="contained"
+                  color="primary"
+                  size="large"
+                  disabled={loading}
+                  sx={{ 
+                    mt: 3, 
+                    py: 1.5, 
+                    position: 'relative',
+                    borderRadius: 2,
+                    fontWeight: 600
+                  }}
+                >
+                  {loading ? (
+                    <CircularProgress 
+                      size={24} 
+                      color="inherit" 
+                      sx={{ position: 'absolute' }} 
+                    />
+                  ) : (
+                    'Sign In'
+                  )}
+                </Button>
+              </Stack>
+            </form>
+
+            <Box sx={{ mt: 4, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                Don't have an account?{' '}
+                <Link 
+                  to="/register" 
+                  style={{ 
+                    color: theme.palette.primary.main,
+                    textDecoration: 'none',
+                    fontWeight: 600
+                  }}
+                >
+                  Sign Up
+                </Link>
+              </Typography>
+            </Box>
+
+            <Box sx={{ width: '100%', textAlign: 'right', mt: 1 }}>
+              <Button size="small" onClick={handleOpenResetDialog} sx={{ textTransform: 'none' }}>
+                Forgot password? (MFA)
               </Button>
             </Box>
-          </Box>
-        </Paper>
-      </Container>
-      
-      {/* MFA Dialog */}
-      <Dialog 
-        open={showMfaDialog} 
-        onClose={() => !loading && setShowMfaDialog(false)}
-        maxWidth="xs"
-        fullWidth
-        PaperProps={{
-          elevation: 0,
-          sx: { 
-            borderRadius: 2,
-            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-            border: '1px solid #e0e0e0'
-          }
-        }}
-      >
-        <DialogTitle sx={{ 
-          borderBottom: '1px solid #e0e0e0', 
-          py: 2.5,
-          typography: 'h5'
-        }}>
-          Two-Factor Authentication
-        </DialogTitle>
-        <DialogContent sx={{ p: 4 }}>
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <LockOutlinedIcon
-              color="secondary"
-              sx={{ fontSize: 48, mb: 2 }}
-            />
-          </Box>
-          
-          <Typography 
-            variant="body1" 
-            gutterBottom 
-            sx={{ 
-              mb: 3, 
-              textAlign: 'center',
-              fontWeight: 500
-            }}
-          >
-            Please enter the 6-digit verification code from your authenticator app
-          </Typography>
-          
-          {mfaError && (
-            <Alert 
-              severity="error" 
-              sx={{ mb: 3 }}
-              variant="outlined"
+          </Card>
+        </Fade>
+        
+        {/* 2FA Dialog */}
+        <Dialog 
+          open={showMfaDialog} 
+          maxWidth="xs"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              px: 1
+            }
+          }}
+        >
+          <DialogTitle sx={{ textAlign: 'center', pt: 4 }}>
+            <Avatar
+              sx={{
+                mb: 2,
+                width: 60,
+                height: 60,
+                backgroundColor: 'primary.main',
+                boxShadow: '0 8px 16px rgba(67, 97, 238, 0.2)',
+                mx: 'auto'
+              }}
             >
-              {mfaError}
-            </Alert>
-          )}
+              <SecurityIcon fontSize="large" />
+            </Avatar>
+            <Typography variant="h5" component="div" fontWeight={700}>
+              Two-Factor Authentication
+            </Typography>
+          </DialogTitle>
           
-          <TextField
-            autoFocus
-            margin="normal"
-            id="mfaCode"
-            label="Verification Code"
-            type="text"
-            fullWidth
-            value={mfaCode}
-            onChange={(e) => setMfaCode(e.target.value)}
-            inputProps={{ 
-              maxLength: 6,
-              inputMode: 'numeric',
-              pattern: '[0-9]*',
-              style: { letterSpacing: '0.5em', textAlign: 'center', fontSize: '1.2rem' }
-            }}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter' && !loading) {
-                handleMfaSubmit();
-              }
-            }}
-            placeholder="000000"
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 1,
-                '&:hover fieldset': {
-                  borderColor: 'secondary.main',
-                },
-              },
-              '& .MuiInputLabel-root.Mui-focused': {
-                color: 'secondary.main',
-              }
-            }}
-          />
-        </DialogContent>
-        <DialogActions sx={{ p: 3, borderTop: '1px solid #e0e0e0' }}>
-          <Button 
-            onClick={() => setShowMfaDialog(false)} 
-            disabled={loading}
-            variant="outlined"
-            sx={{ mr: 1 }}
-          >
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleMfaSubmit} 
-            color="secondary" 
-            variant="contained"
-            disabled={loading}
-            sx={{ px: 3 }}
-          >
-            {loading ? 'Verifying...' : 'Verify'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+          <DialogContent sx={{ px: 3 }}>
+            <Typography variant="body1" align="center" sx={{ mb: 3 }}>
+              Please enter the verification code from your authenticator app
+            </Typography>
+            
+            {mfaError && (
+              <Alert 
+                severity="error" 
+                sx={{ 
+                  mb: 3, 
+                  borderRadius: 2
+                }}
+              >
+                {mfaError}
+              </Alert>
+            )}
+            
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Authentication Code"
+              type="text"
+              fullWidth
+              value={mfaCode}
+              onChange={(e) => setMfaCode(e.target.value)}
+              variant="outlined"
+              autoComplete="one-time-code"
+              placeholder="Enter 6-digit code"
+              inputProps={{ 
+                maxLength: 6,
+                inputMode: 'numeric',
+                pattern: '[0-9]*'
+              }}
+              sx={{ mt: 1 }}
+              InputProps={{
+                sx: { borderRadius: 2 }
+              }}
+            />
+          </DialogContent>
+          
+          <DialogActions sx={{ px: 3, pb: 4, justifyContent: 'center' }}>
+            <Button 
+              onClick={() => {
+                setShowMfaDialog(false);
+                setMfaCode('');
+                setMfaError('');
+              }}
+              variant="outlined"
+              startIcon={<ArrowBackIcon />}
+              sx={{ mr: 1, borderRadius: 2 }}
+            >
+              Back
+            </Button>
+            <Button 
+              onClick={handleMfaSubmit} 
+              variant="contained"
+              disabled={loading}
+              startIcon={<VerifiedUserIcon />}
+              sx={{ 
+                borderRadius: 2,
+                position: 'relative',
+                minWidth: 120
+              }}
+            >
+              {loading ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : (
+                'Verify'
+              )}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Password Reset Dialog */}
+        <Dialog open={showResetDialog} onClose={handleCloseResetDialog}>
+          <DialogTitle>Reset Password (MFA)</DialogTitle>
+          <DialogContent>
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Username"
+              type="text"
+              fullWidth
+              value={resetUsername}
+              onChange={e => { setResetUsername(e.target.value); setResetMfaEnabled(null); setResetMessage(''); }}
+              onBlur={handleResetUsernameBlur}
+              disabled={resetLoading}
+            />
+            {resetMfaEnabled === false && (
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                This user does not have MFA enabled. Please contact the administrator to reset your password.
+              </Alert>
+            )}
+            {resetMfaEnabled && (
+              <>
+                <TextField
+                  margin="dense"
+                  label="TOTP Code"
+                  type="text"
+                  fullWidth
+                  value={resetMfaCode}
+                  onChange={e => setResetMfaCode(e.target.value)}
+                  disabled={resetLoading}
+                />
+                <TextField
+                  margin="dense"
+                  label="New Password"
+                  type="password"
+                  fullWidth
+                  value={resetNewPassword}
+                  onChange={e => setResetNewPassword(e.target.value)}
+                  disabled={resetLoading}
+                />
+              </>
+            )}
+            {resetMessage && (
+              <Alert severity={resetMessage.includes('successful') ? 'success' : resetMfaEnabled === false ? 'warning' : 'error'} sx={{ mt: 2 }}>{resetMessage}</Alert>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseResetDialog} disabled={resetLoading}>Cancel</Button>
+            <Button onClick={handleRequestReset} disabled={resetLoading || !resetMfaEnabled} variant="contained">
+              {resetLoading ? <CircularProgress size={20} /> : 'Reset Password'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Container>
     </Box>
   );
 };
