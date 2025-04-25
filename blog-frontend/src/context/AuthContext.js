@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AuthService from '../services/auth.service';
+import { maskEmail } from '../utils/formatUtils';
 
 // Create the auth context
 const AuthContext = createContext();
@@ -38,12 +39,13 @@ export const AuthProvider = ({ children }) => {
       const response = await AuthService.login(username, password, mfaCode);
       console.log('Login response:', response);
       
-      // Check if MFA is required
-      if (response.mfaRequired) {
-        console.log('MFA required for user:', username);
+      // Check if MFA is required - handle both direct response and response.data structure
+      if ((response && response.mfaRequired) || (response && response.data && response.data.mfaRequired)) {
+        const mfaResponse = response.mfaRequired ? response : response.data;
+        console.log('MFA required for user:', maskEmail(username));
         setMfaRequired(true);
         setMfaUsername(username); // Store username for MFA validation
-        return { mfaRequired: true, message: response.message };
+        return { mfaRequired: true, message: mfaResponse.message || 'MFA verification required' };
       }
       
       // If we have a successful login
@@ -61,7 +63,7 @@ export const AuthProvider = ({ children }) => {
   const validateMfa = async (code, username = null) => {
     try {
       const usernameToUse = username || mfaUsername;
-      console.log('Validating MFA for username:', usernameToUse);
+      console.log('Validating MFA for username:', maskEmail(usernameToUse));
       
       if (!usernameToUse) {
         console.error('No username stored for MFA validation');
@@ -96,11 +98,27 @@ export const AuthProvider = ({ children }) => {
   };
   
   // Logout method
-  const logout = () => {
-    AuthService.logout();
-    setUser(null);
-    setMfaRequired(false);
-    setMfaUsername('');
+  const logout = async () => {
+    try {
+      // Call the service logout which now returns a Promise
+      const result = await AuthService.logout();
+      
+      // Even if server-side logout fails, we still clear user state locally
+      setUser(null);
+      setMfaRequired(false);
+      setMfaUsername('');
+      
+      return result;
+    } catch (error) {
+      console.error('Error during logout:', error);
+      
+      // Clear local state even on error
+      setUser(null);
+      setMfaRequired(false);
+      setMfaUsername('');
+      
+      throw error; // Re-throw for caller to handle if needed
+    }
   };
   
   // Register method

@@ -20,16 +20,19 @@ public class UserDetailsImpl implements UserDetails {
 
     @JsonIgnore
     private String password;
+    
+    private boolean active;
 
     private Collection<? extends GrantedAuthority> authorities;
 
     public UserDetailsImpl(Long id, String username, String email, String password,
-                          Collection<? extends GrantedAuthority> authorities) {
+                          Collection<? extends GrantedAuthority> authorities, boolean active) {
         this.id = id;
         this.username = username;
         this.email = email;
         this.password = password;
         this.authorities = authorities;
+        this.active = active;
     }
 
     public static UserDetailsImpl build(User user) {
@@ -42,7 +45,8 @@ public class UserDetailsImpl implements UserDetails {
                 user.getUsername(),
                 user.getEmail(),
                 user.getPassword(),
-                authorities);
+                authorities,
+                user.isActive());
     }
 
     @Override
@@ -75,7 +79,7 @@ public class UserDetailsImpl implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return active;
     }
 
     @Override
@@ -85,7 +89,7 @@ public class UserDetailsImpl implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return active;
     }
 
     @Override

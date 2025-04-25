@@ -31,6 +31,7 @@ import {
   Delete as DeleteIcon,
   AddPhotoAlternate as AddPhotoAlternateIcon,
   CheckCircle as CheckCircleIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { getArticleById, createArticle, updateArticle, getCategories, uploadImage } from '../../services/api';
 import { API_URL } from '../../services/api';
@@ -51,6 +52,7 @@ const ArticleForm = () => {
     categoryId: '',
     statusEnum: 'PUBLISHED',
     imagePath: '',
+    version: 0,
   });
   
   const [categories, setCategories] = useState([]);
@@ -60,6 +62,9 @@ const ArticleForm = () => {
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [showVersionConflict, setShowVersionConflict] = useState(false);
+  const [currentArticle, setCurrentArticle] = useState(null);
+  const [alert, setAlert] = useState(null);
 
   useEffect(() => {
     console.log('ArticleForm component mounted');
@@ -117,6 +122,7 @@ const ArticleForm = () => {
               categoryId: articleData.categoryId || '',
               statusEnum: articleData.statusEnum || 'PUBLISHED',
               imagePath: articleData.imagePath || '',
+              version: articleData.version || 0,
             });
             
             console.log('Form data set from direct call:', {
@@ -125,6 +131,7 @@ const ArticleForm = () => {
               categoryId: articleData.categoryId || '',
               statusEnum: articleData.statusEnum || 'PUBLISHED',
               imagePath: articleData.imagePath || '',
+              version: articleData.version || 0,
             });
             
             if (articleData.imagePath) {
@@ -154,6 +161,7 @@ const ArticleForm = () => {
               categoryId: articleData.categoryId || '',
               statusEnum: articleData.statusEnum || 'PUBLISHED',
               imagePath: articleData.imagePath || '',
+              version: articleData.version || 0,
             });
             
             if (articleData.imagePath) {
@@ -330,6 +338,7 @@ const ArticleForm = () => {
         ...formData,
         categoryId,
         imagePath: finalImagePath || '', // Use empty string if no image path
+        version: formData.version, // Ensure version is sent
       };
       
       console.log('Saving article with data:', articleData);
@@ -343,6 +352,20 @@ const ArticleForm = () => {
           navigate(`/articles/${id}`);
         } catch (updateErr) {
           console.error("Update error:", updateErr);
+          
+          // Check for version conflict (HTTP 409 Conflict)
+          if (updateErr.response && updateErr.response.status === 409) {
+            console.log("Version conflict detected");
+            
+            // Get the current version from the server response
+            const serverArticle = updateErr.response.data.currentArticle;
+            
+            // Show conflict dialog with current data from server
+            setCurrentArticle(serverArticle);
+            setShowVersionConflict(true);
+            setLoading(false);
+            return;
+          }
           
           // Detailed error handling
           if (updateErr.response) {
@@ -400,6 +423,38 @@ const ArticleForm = () => {
       let errorMessage = err.message || 'Failed to save article. Please try again.';
       setError(errorMessage);
     } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to handle reloading the current data
+  const handleReloadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch the latest article from the server
+      const response = await getArticleById(id);
+      const latestArticle = response.data;
+      
+      // Update form with the latest data
+      setFormData({
+        ...latestArticle,
+        categoryId: latestArticle.categoryId.toString(),
+      });
+      
+      // Close the conflict dialog
+      setShowVersionConflict(false);
+      setLoading(false);
+      
+      // Show success message
+      setAlert({
+        severity: 'success',
+        message: 'Article data has been refreshed with the latest version'
+      });
+      
+    } catch (error) {
+      console.error("Failed to reload article data:", error);
+      setError("Failed to reload the latest article data. Please try again.");
       setLoading(false);
     }
   };
@@ -470,6 +525,52 @@ const ArticleForm = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
+      {/* Alert message */}
+      {alert && (
+        <Alert severity={alert.severity} onClose={() => setAlert(null)} sx={{ mb: 2 }}>
+          {alert.message}
+        </Alert>
+      )}
+      {/* Version conflict dialog */}
+      {showVersionConflict && (
+        <Paper
+          elevation={3}
+          sx={{
+            p: 3,
+            mb: 3,
+            border: '1px solid',
+            borderColor: 'error.main',
+            backgroundColor: 'error.lighter',
+          }}
+        >
+          <Typography variant="h6" color="error" gutterBottom>
+            Version Conflict Detected
+          </Typography>
+          <Typography variant="body1" paragraph>
+            Another user has modified this article while you were editing it. Your changes cannot be saved without overwriting their work.
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            You can either reload the latest version of the article and merge your changes manually, or cancel and lose your edits.
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<RefreshIcon />}
+              onClick={handleReloadData}
+            >
+              Reload Latest Version
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => navigate(`/articles/${id}`)}
+            >
+              Cancel Editing
+            </Button>
+          </Box>
+        </Paper>
+      )}
+      
       <Paper elevation={0} sx={{ p: 4, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
         <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>

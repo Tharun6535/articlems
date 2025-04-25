@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { maskEmail } from '../utils/formatUtils';
 
 // Use absolute URL to match api.js
-const API_URL = 'http://localhost:8081/api/auth/';
+const API_URL = 'http://localhost:8080/api/auth/';
 
 // Configure axios with credentials
 axios.defaults.withCredentials = true;
@@ -11,7 +12,7 @@ let pendingMfaUsername = '';
 
 class AuthService {
   login(username, password, mfaCode = null) {
-    console.log('Attempting login with:', username, mfaCode ? 'and MFA code' : 'without MFA code');
+    console.log('Attempting login with:', maskEmail(username), mfaCode ? 'and MFA code' : 'without MFA code');
     return axios
       .post(API_URL + 'login', {
         username,
@@ -68,17 +69,20 @@ class AuthService {
       return Promise.reject(new Error('No username available for MFA validation'));
     }
     
-    // Format the code - remove spaces and ensure it's just digits
-    const formattedCode = code.replace(/\s+/g, '').trim();
+    // Clean the code, removing any spaces or dashes that the user might have added
+    const formattedCode = code.replace(/\D/g, '');
     
-    console.log(`Sending MFA validation for user: ${effectiveUsername}, code length: ${formattedCode.length}`);
+    console.log(`Sending MFA validation for user: ${maskEmail(effectiveUsername)}, code length: ${formattedCode.length}`);
     
-    // Log the full request for debugging
+    // Call the MFA validation endpoint
     const requestBody = { username: effectiveUsername, code: formattedCode };
-    console.log('MFA validation request:', requestBody);
+    console.log('MFA validation request:', { 
+      username: maskEmail(effectiveUsername), 
+      code: formattedCode ? '******' : 'empty' 
+    });
     
     return axios
-      .post('http://localhost:8081/api/mfa/validate', requestBody, {
+      .post('http://localhost:8080/api/mfa/validate', requestBody, {
         withCredentials: true,
         headers: {
           'Content-Type': 'application/json',
@@ -130,9 +134,36 @@ class AuthService {
   }
 
   logout() {
-    localStorage.removeItem('user');
-    // Clear any pending MFA username
-    pendingMfaUsername = '';
+    const user = this.getCurrentUser();
+    
+    // If user is logged in, call backend logout endpoint
+    if (user && user.accessToken) {
+      console.log('Logging out on server...');
+      return axios.post(API_URL + 'logout', {}, {
+        headers: {
+          'Authorization': 'Bearer ' + user.accessToken
+        },
+        withCredentials: true
+      })
+      .then(() => {
+        console.log('Logout successful on server');
+        localStorage.removeItem('user');
+        pendingMfaUsername = '';
+        return { success: true };
+      })
+      .catch(error => {
+        console.error('Error during logout:', error);
+        // Even if server logout fails, clear local data
+        localStorage.removeItem('user');
+        pendingMfaUsername = '';
+        return { success: false, error: error.message };
+      });
+    } else {
+      // No user to logout, just clear local data
+      localStorage.removeItem('user');
+      pendingMfaUsername = '';
+      return Promise.resolve({ success: true });
+    }
   }
 
   register(username, email, password) {

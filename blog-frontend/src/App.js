@@ -199,9 +199,24 @@ function AppContent() {
   }, []);
 
   const logOut = () => {
-    AuthService.logout();
-    setCurrentUser(null);
-    window.location.href = '/';
+    setPageLoading(true); // Show loading state
+    
+    AuthService.logout()
+      .then(response => {
+        console.log('Logout completed:', response);
+        setCurrentUser(null);
+        window.location.href = '/';
+      })
+      .catch(error => {
+        console.error('Logout error:', error);
+        // Even if server logout fails, we still log out the user locally
+        setCurrentUser(null);
+        window.location.href = '/';
+      })
+      .finally(() => {
+        // If navigation doesn't happen for some reason, stop showing loading
+        setTimeout(() => setPageLoading(false), 1000);
+      });
   };
 
   const toggleDrawer = () => {

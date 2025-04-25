@@ -57,7 +57,8 @@ import {
   People as PeopleIcon
 } from '@mui/icons-material';
 import { getArticlesPaginated, getCategories, deleteArticle } from '../../services/api';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartTooltip, ResponsiveContainer, Legend, LineChart, Line } from 'recharts';
+import axios from 'axios';
 
 // Define colors for charts
 const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
@@ -67,6 +68,72 @@ const BAR_COLORS = {
   UNDER_REVIEW: '#0288d1', // info.main
   RE_WRITE: '#d32f2f' // error.main
 };
+
+function UserRegistrationsChart({ chartOrientations, toggleChartOrientation }) {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const isHorizontal = chartOrientations.registrations === 'horizontal';
+
+  useEffect(() => {
+    axios.get('/api/admin/users/registrations-per-day')
+      .then(res => {
+        setData(res.data);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError('Failed to load registration data');
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) return <div>Loading user registrations chart...</div>;
+  if (error) return <div>{error}</div>;
+
+  return (
+    <div style={{ margin: '2rem 0', background: '#fff', padding: 24, borderRadius: 8, boxShadow: '0 2px 8px #f0f1f2' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <h3>User Registrations Over Time</h3>
+        <Button 
+          size="small"
+          variant="outlined"
+          onClick={() => toggleChartOrientation('registrations')}
+        >
+          {isHorizontal ? 'Vertical' : 'Horizontal'} View
+        </Button>
+      </Box>
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart 
+          data={data} 
+          margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
+          layout={isHorizontal ? 'vertical' : 'horizontal'}
+        >
+          <CartesianGrid strokeDasharray="3 3" />
+          {isHorizontal ? (
+            <>
+              <YAxis dataKey="date" type="category" />
+              <XAxis type="number" />
+            </>
+          ) : (
+            <>
+              <XAxis dataKey="date" />
+              <YAxis allowDecimals={false} />
+            </>
+          )}
+          <Tooltip />
+          <Line 
+            type="monotone" 
+            dataKey="count" 
+            stroke="#8884d8" 
+            strokeWidth={2}
+            // For vertical layout, orient data points differently
+            {...(isHorizontal && { fill: '#8884d8' })}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 const AdminDashboard = () => {
   const theme = useTheme();
@@ -98,6 +165,23 @@ const AdminDashboard = () => {
     recentActivity: []
   });
   
+  // Add chart orientation state here
+  const [chartOrientations, setChartOrientations] = useState({
+    registrations: 'vertical',
+    categories: 'pie',
+    status: 'vertical'
+  });
+
+  // Add toggle function here
+  const toggleChartOrientation = (chartName) => {
+    setChartOrientations(prev => ({
+      ...prev,
+      [chartName]: prev[chartName] === 'vertical' ? 'horizontal' : 
+                  prev[chartName] === 'horizontal' ? 'vertical' : 
+                  prev[chartName] === 'pie' ? 'bar' : 'pie'
+    }));
+  };
+
   // Fetch data
   useEffect(() => {
     const fetchData = async () => {
@@ -387,336 +471,386 @@ const AdminDashboard = () => {
   const paginatedArticles = articles.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Typography variant="h4" component="h1" fontWeight="bold" color="primary">
-          Admin Dashboard
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<RefreshIcon />}
-            onClick={() => window.location.reload()}
-          >
-            Refresh Data
-          </Button>
-          <Button
-            variant="contained"
-            color="success"
-            startIcon={<AddIcon />}
-            component={RouterLink}
-            to="/add-article"
-          >
-            New Article
-          </Button>
-          <Button
-            variant="contained"
-            color="secondary"
-            startIcon={<ArticleIcon />}
-            component={RouterLink}
-            to="/import-csv"
-          >
-            Import CSV
-          </Button>
-          <Button
-            variant="contained"
-            color="info"
-            startIcon={<PeopleIcon />}
-            component={RouterLink}
-            to="/admin/users"
-          >
-            User Management
-          </Button>
-        </Box>
-      </Box>
-
-      {/* Stats Row */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {statsLoading ? (
-          <Grid item xs={12}><LinearProgress /></Grid>
-        ) : (
-          <>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard 
-                title="Total Articles" 
-                value={stats.totalArticles} 
-                icon={<ArticleIcon color="primary" />} 
-                color="primary.main" 
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard 
-                title="Published" 
-                value={stats.publishedArticles} 
-                icon={<CheckCircleIcon color="success" />} 
-                color="success.main"
-                percent={stats.totalArticles > 0 ? ((stats.publishedArticles / stats.totalArticles) * 100).toFixed(0) + '%' : '0%'}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard 
-                title="Under Review / Coming Soon" 
-                value={stats.underReviewArticles + stats.comingSoonArticles} 
-                icon={<InfoIcon color="info" />} 
-                color="info.main" 
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <StatCard 
-                title="Needs Rewrite" 
-                value={stats.rewriteArticles} 
-                icon={<WarningIcon color="error" />} 
-                color="error.main" 
-              />
-            </Grid>
-          </>
-        )}
-      </Grid>
-
-      {/* Charts Row */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        {statsLoading ? (
-          <Grid item xs={12} md={6}><LinearProgress /></Grid>
-        ) : (
-          <Grid item xs={12} md={6}>
-            <Paper elevation={2} sx={{ p: 2, height: 350 }}>
-              <Typography variant="h6" gutterBottom>Articles per Category</Typography>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={stats.articlesPerCategory.filter(item => item.value > 0)} // Filter out categories with 0 articles
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {stats.articlesPerCategory.filter(item => item.value > 0).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <RechartTooltip content={<CustomTooltip />} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </Paper>
-          </Grid>
-        )}
-        
-        {statsLoading ? (
-          <Grid item xs={12} md={6}><LinearProgress /></Grid>
-        ) : (
-          <Grid item xs={12} md={6}>
-            <Paper elevation={2} sx={{ p: 2, height: 350 }}>
-              <Typography variant="h6" gutterBottom>Article Status Distribution</Typography>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  data={[
-                    { name: 'Published', count: stats.publishedArticles, fill: BAR_COLORS.PUBLISHED },
-                    { name: 'Coming Soon', count: stats.comingSoonArticles, fill: BAR_COLORS.COMING_SOON },
-                    { name: 'Under Review', count: stats.underReviewArticles, fill: BAR_COLORS.UNDER_REVIEW },
-                    { name: 'Needs Rewrite', count: stats.rewriteArticles, fill: BAR_COLORS.RE_WRITE },
-                  ]}
-                  margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis allowDecimals={false}/>
-                  <RechartTooltip content={<CustomTooltip />} />
-                  <Bar dataKey="count" />
-                </BarChart>
-              </ResponsiveContainer>
-            </Paper>
-          </Grid>
-        )}
-      </Grid>
-
-      {/* Recent Articles */}
-      <Paper sx={{ p: 3, borderRadius: 2, mb: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h6" fontWeight="medium">
-            Recent Articles
+    <div>
+      <UserRegistrationsChart 
+        chartOrientations={chartOrientations} 
+        toggleChartOrientation={toggleChartOrientation} 
+      />
+      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+          <Typography variant="h4" component="h1" fontWeight="bold" color="primary">
+            Admin Dashboard
           </Typography>
-          <Button
-            variant="outlined"
-            color="primary"
-            size="small"
-            startIcon={<FormatListBulletedIcon />}
-            component={RouterLink}
-            to="/articles"
-          >
-            View All
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<RefreshIcon />}
+              onClick={() => window.location.reload()}
+            >
+              Refresh Data
+            </Button>
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<AddIcon />}
+              component={RouterLink}
+              to="/add-article"
+            >
+              New Article
+            </Button>
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={<ArticleIcon />}
+              component={RouterLink}
+              to="/import-csv"
+            >
+              Import CSV
+            </Button>
+            <Button
+              variant="contained"
+              color="info"
+              startIcon={<PeopleIcon />}
+              component={RouterLink}
+              to="/admin/users"
+            >
+              User Management
+            </Button>
+          </Box>
         </Box>
-        <TableContainer>
-          <Table sx={{ minWidth: 650 }} aria-label="articles table">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>Title</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Category</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginatedArticles.map((article) => (
-                <TableRow
-                  key={article.id}
-                  sx={{ 
-                    '&:last-child td, &:last-child th': { border: 0 },
-                    transition: 'background-color 0.2s',
-                    '&:hover': {
-                      backgroundColor: alpha(theme.palette.primary.main, 0.05)
-                    }
-                  }}
-                >
-                  <TableCell component="th" scope="row">
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Avatar 
-                        variant="rounded"
-                        src={article.imagePath?.startsWith('http') 
-                          ? article.imagePath 
-                          : (article.imagePath ? `http://localhost:8081${article.imagePath}` : undefined)}
-                        sx={{ 
-                          mr: 2, 
-                          width: 40, 
-                          height: 40,
-                          bgcolor: !article.imagePath ? theme.palette.primary.main : undefined
-                        }}
+
+        {/* Stats Row */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {statsLoading ? (
+            <Grid item xs={12}><LinearProgress /></Grid>
+          ) : (
+            <>
+              <Grid item xs={12} sm={6} md={3}>
+                <StatCard 
+                  title="Total Articles" 
+                  value={stats.totalArticles} 
+                  icon={<ArticleIcon color="primary" />} 
+                  color="primary.main" 
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <StatCard 
+                  title="Published" 
+                  value={stats.publishedArticles} 
+                  icon={<CheckCircleIcon color="success" />} 
+                  color="success.main"
+                  percent={stats.totalArticles > 0 ? ((stats.publishedArticles / stats.totalArticles) * 100).toFixed(0) + '%' : '0%'}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <StatCard 
+                  title="Under Review / Coming Soon" 
+                  value={stats.underReviewArticles + stats.comingSoonArticles} 
+                  icon={<InfoIcon color="info" />} 
+                  color="info.main" 
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <StatCard 
+                  title="Needs Rewrite" 
+                  value={stats.rewriteArticles} 
+                  icon={<WarningIcon color="error" />} 
+                  color="error.main" 
+                />
+              </Grid>
+            </>
+          )}
+        </Grid>
+
+        {/* Charts Row */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {statsLoading ? (
+            <Grid item xs={12} md={6}><LinearProgress /></Grid>
+          ) : (
+            <Grid item xs={12} md={6}>
+              <Paper elevation={2} sx={{ p: 2, height: 350, display: 'flex', flexDirection: 'column' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6" gutterBottom>Articles per Category</Typography>
+                  <Button 
+                    size="small"
+                    variant="outlined"
+                    onClick={() => toggleChartOrientation('categories')}
+                  >
+                    {chartOrientations.categories === 'pie' ? 'Bar' : 'Pie'} Chart
+                  </Button>
+                </Box>
+                <Box sx={{ flex: 1, minHeight: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    {chartOrientations.categories === 'pie' ? (
+                      <PieChart>
+                        <Pie
+                          data={stats.articlesPerCategory.filter(item => item.value > 0)}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {stats.articlesPerCategory.filter(item => item.value > 0).map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <RechartTooltip content={<CustomTooltip />} />
+                        <Legend />
+                      </PieChart>
+                    ) : (
+                      <BarChart 
+                        data={stats.articlesPerCategory.filter(item => item.value > 0)}
+                        layout={chartOrientations.categories === 'horizontal' ? 'vertical' : 'horizontal'}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                       >
-                        {!article.imagePath && article.title.charAt(0).toUpperCase()}
-                      </Avatar>
-                      <Typography
-                        component={RouterLink}
-                        to={`/articles/${article.id}`}
-                        sx={{ 
-                          color: 'inherit', 
-                          textDecoration: 'none',
-                          '&:hover': { color: theme.palette.primary.main }
-                        }}
-                      >
-                        {article.title}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>{categoryMap[article.categoryId] || 'Unknown'}</TableCell>
-                  <TableCell>
-                    <Chip
-                      icon={getStatusIcon(article.statusEnum)}
-                      label={article.statusEnum}
-                      color={getStatusColor(article.statusEnum)}
-                      size="small"
-                      sx={{ fontWeight: 'medium' }}
-                    />
-                  </TableCell>
-                  <TableCell>{formatDate(article.createDateTime)}</TableCell>
-                  <TableCell>
-                    <Stack direction="row" spacing={1}>
-                      <Tooltip title="View Article">
-                        <IconButton
-                          size="small"
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" type={chartOrientations.categories === 'horizontal' ? 'category' : 'category'} />
+                        <YAxis type={chartOrientations.categories === 'horizontal' ? 'number' : 'number'} />
+                        <RechartTooltip content={<CustomTooltip />} />
+                        <Legend />
+                        <Bar dataKey="value">
+                          {stats.articlesPerCategory.filter(item => item.value > 0).map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                </Box>
+              </Paper>
+            </Grid>
+          )}
+          
+          {statsLoading ? (
+            <Grid item xs={12} md={6}><LinearProgress /></Grid>
+          ) : (
+            <Grid item xs={12} md={6}>
+              <Paper elevation={2} sx={{ p: 2, height: 350, display: 'flex', flexDirection: 'column' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6" gutterBottom>Article Status Distribution</Typography>
+                </Box>
+                <Box sx={{ flex: 1, minHeight: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart 
+                      data={[
+                        { name: 'Published', count: stats.publishedArticles, fill: BAR_COLORS.PUBLISHED },
+                        { name: 'Coming Soon', count: stats.comingSoonArticles, fill: BAR_COLORS.COMING_SOON },
+                        { name: 'Under Review', count: stats.underReviewArticles, fill: BAR_COLORS.UNDER_REVIEW },
+                        { name: 'Needs Rewrite', count: stats.rewriteArticles, fill: BAR_COLORS.RE_WRITE },
+                      ]}
+                      layout="horizontal"
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis allowDecimals={false} />
+                      <RechartTooltip content={<CustomTooltip />} />
+                      <Bar dataKey="count">
+                        {[
+                          { name: 'Published', fill: BAR_COLORS.PUBLISHED },
+                          { name: 'Coming Soon', fill: BAR_COLORS.COMING_SOON },
+                          { name: 'Under Review', fill: BAR_COLORS.UNDER_REVIEW },
+                          { name: 'Needs Rewrite', fill: BAR_COLORS.RE_WRITE },
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </Box>
+              </Paper>
+            </Grid>
+          )}
+        </Grid>
+
+        {/* Recent Articles */}
+        <Paper sx={{ p: 3, borderRadius: 2, mb: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h6" fontWeight="medium">
+              Recent Articles
+            </Typography>
+            <Button
+              variant="outlined"
+              color="primary"
+              size="small"
+              startIcon={<FormatListBulletedIcon />}
+              component={RouterLink}
+              to="/articles"
+            >
+              View All
+            </Button>
+          </Box>
+          <TableContainer>
+            <Table sx={{ minWidth: 650 }} aria-label="articles table">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Title</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Category</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {paginatedArticles.map((article) => (
+                  <TableRow
+                    key={article.id}
+                    sx={{ 
+                      '&:last-child td, &:last-child th': { border: 0 },
+                      transition: 'background-color 0.2s',
+                      '&:hover': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.05)
+                      }
+                    }}
+                  >
+                    <TableCell component="th" scope="row">
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Avatar 
+                          variant="rounded"
+                          src={article.imagePath?.startsWith('http') 
+                            ? article.imagePath 
+                            : (article.imagePath ? `http://localhost:8081${article.imagePath}` : undefined)}
+                          sx={{ 
+                            mr: 2, 
+                            width: 40, 
+                            height: 40,
+                            bgcolor: !article.imagePath ? theme.palette.primary.main : undefined
+                          }}
+                        >
+                          {!article.imagePath && article.title.charAt(0).toUpperCase()}
+                        </Avatar>
+                        <Typography
                           component={RouterLink}
                           to={`/articles/${article.id}`}
-                          color="primary"
+                          sx={{ 
+                            color: 'inherit', 
+                            textDecoration: 'none',
+                            '&:hover': { color: theme.palette.primary.main }
+                          }}
                         >
-                          <VisibilityIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Edit Article">
-                        <IconButton
-                          color="primary"
-                          component={RouterLink}
-                          to={`/article/edit/${article.id}`}
-                          size="small"
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Test Page">
-                        <IconButton
-                          component={RouterLink}
-                          to={`/test-article/${article.id}`}
-                          size="small"
-                          color="success"
-                        >
-                          <ArticleIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="More Actions">
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleOpenActionMenu(e, article.id)}
-                        >
-                          <MoreVertIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
-          count={articles.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-        />
+                          {article.title}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>{categoryMap[article.categoryId] || 'Unknown'}</TableCell>
+                    <TableCell>
+                      <Chip
+                        icon={getStatusIcon(article.statusEnum)}
+                        label={article.statusEnum}
+                        color={getStatusColor(article.statusEnum)}
+                        size="small"
+                        sx={{ fontWeight: 'medium' }}
+                      />
+                    </TableCell>
+                    <TableCell>{formatDate(article.createDateTime)}</TableCell>
+                    <TableCell>
+                      <Stack direction="row" spacing={1}>
+                        <Tooltip title="View Article">
+                          <IconButton
+                            size="small"
+                            component={RouterLink}
+                            to={`/articles/${article.id}`}
+                            color="primary"
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Edit Article">
+                          <IconButton
+                            color="primary"
+                            component={RouterLink}
+                            to={`/article/edit/${article.id}`}
+                            size="small"
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Test Page">
+                          <IconButton
+                            component={RouterLink}
+                            to={`/test-article/${article.id}`}
+                            size="small"
+                            color="success"
+                          >
+                            <ArticleIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="More Actions">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleOpenActionMenu(e, article.id)}
+                          >
+                            <MoreVertIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={articles.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
 
-        {/* Action Menu */}
-        <Menu
-          anchorEl={actionMenuAnchorEl}
-          open={Boolean(actionMenuAnchorEl)}
-          onClose={handleCloseActionMenu}
-          transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-          anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-        >
-          <MenuItem onClick={handleDeleteArticle} sx={{ color: theme.palette.error.main }}>
-            <ListItemIcon>
-              <DeleteIcon fontSize="small" color="error" />
-            </ListItemIcon>
-            <ListItemText>Delete Article</ListItemText>
-          </MenuItem>
-        </Menu>
-      </Paper>
+          {/* Action Menu */}
+          <Menu
+            anchorEl={actionMenuAnchorEl}
+            open={Boolean(actionMenuAnchorEl)}
+            onClose={handleCloseActionMenu}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+          >
+            <MenuItem onClick={handleDeleteArticle} sx={{ color: theme.palette.error.main }}>
+              <ListItemIcon>
+                <DeleteIcon fontSize="small" color="error" />
+              </ListItemIcon>
+              <ListItemText>Delete Article</ListItemText>
+            </MenuItem>
+          </Menu>
+        </Paper>
 
-      {/* Recent Activity */}
-      <Paper sx={{ p: 3, borderRadius: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-        <Typography variant="h6" fontWeight="medium" gutterBottom>
-          Recent Activity
-        </Typography>
-        <List>
-          {stats.recentActivity.map((activity, index) => (
-            <React.Fragment key={`${activity.type}-${activity.id}-${index}`}>
-              {index > 0 && <Divider component="li" />}
-              <ListItem alignItems="flex-start">
-                <ListItemIcon>
-                  {activity.type === 'article' ? <ArticleIcon color="primary" /> : <CategoryIcon color="secondary" />}
-                </ListItemIcon>
-                <ListItemText
-                  primary={activity.title}
-                  secondary={
-                    <>
-                      <Typography component="span" variant="body2" color="text.primary">
-                        {activity.action}
-                      </Typography>
-                      {' — '}{formatDate(activity.date)}
-                    </>
-                  }
-                />
-              </ListItem>
-            </React.Fragment>
-          ))}
-        </List>
-      </Paper>
-    </Container>
+        {/* Recent Activity */}
+        <Paper sx={{ p: 3, borderRadius: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+          <Typography variant="h6" fontWeight="medium" gutterBottom>
+            Recent Activity
+          </Typography>
+          <List>
+            {stats.recentActivity.map((activity, index) => (
+              <React.Fragment key={`${activity.type}-${activity.id}-${index}`}>
+                {index > 0 && <Divider component="li" />}
+                <ListItem alignItems="flex-start">
+                  <ListItemIcon>
+                    {activity.type === 'article' ? <ArticleIcon color="primary" /> : <CategoryIcon color="secondary" />}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={activity.title}
+                    secondary={
+                      <>
+                        <Typography component="span" variant="body2" color="text.primary">
+                          {activity.action}
+                        </Typography>
+                        {' — '}{formatDate(activity.date)}
+                      </>
+                    }
+                  />
+                </ListItem>
+              </React.Fragment>
+            ))}
+          </List>
+        </Paper>
+      </Container>
+    </div>
   );
 };
 

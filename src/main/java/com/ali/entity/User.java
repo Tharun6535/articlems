@@ -10,6 +10,7 @@ import javax.validation.constraints.Size;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
+import com.ali.converter.EmailConverter;
 
 @Entity
 @Table(name = "users", 
@@ -31,6 +32,7 @@ public class User {
     @NotBlank
     @Size(max = 50)
     @Email
+    @Convert(converter = EmailConverter.class)
     private String email;
 
     @Column(name = "password", nullable = false)
@@ -43,6 +45,12 @@ public class User {
     
     @Column(name = "mfa_secret", length = 64)
     private String mfaSecret;
+    
+    @Column(name = "active", nullable = false)
+    private boolean active = true;
+
+    @Column(name = "failed_login_attempts")
+    private int failedLoginAttempts = 0;
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(name = "user_roles", 
@@ -137,5 +145,44 @@ public class User {
     
     public void setMfaSecret(String mfaSecret) {
         this.mfaSecret = mfaSecret;
+    }
+    
+    public boolean isActive() {
+        return active;
+    }
+    
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    @Transient
+    public LocalDateTime getAccountExpiryDate() {
+        if (createDateTime == null) return null;
+        return createDateTime.plusYears(1);
+    }
+    
+    @Transient
+    public boolean isAccountExpired() {
+        LocalDateTime expiryDate = getAccountExpiryDate();
+        return expiryDate != null && expiryDate.isBefore(LocalDateTime.now());
+    }
+
+    public int getFailedLoginAttempts() {
+        return failedLoginAttempts;
+    }
+
+    public void setFailedLoginAttempts(int failedLoginAttempts) {
+        this.failedLoginAttempts = failedLoginAttempts;
+    }
+
+    public void incrementFailedLoginAttempts() {
+        this.failedLoginAttempts++;
+        if (this.failedLoginAttempts >= 5) {
+            this.active = false;
+        }
+    }
+
+    public void resetFailedLoginAttempts() {
+        this.failedLoginAttempts = 0;
     }
 } 

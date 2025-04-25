@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.HashMap;
+import javax.persistence.OptimisticLockException;
 
 @RestController
 @RequestMapping("/api/articles")
@@ -142,33 +143,46 @@ public class ArticleManagementController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateArticle(@PathVariable("id") Long id, @RequestBody @Valid ArticleDTO articleDTO) {
+    public ResponseEntity<?> updateArticle(@PathVariable("id") Long id, @RequestBody ArticleDTO articleDTO) {
         try {
             logger.info("Updating article with id: {}", id);
-            logger.info("Received image path: {}", articleDTO.getImagePath());
             
-            // Ensure we preserve the image path if it exists in the request
-            if (articleDTO.getImagePath() != null && !articleDTO.getImagePath().isEmpty()) {
-                logger.info("Updating with image path: {}", articleDTO.getImagePath());
-            } else {
-                // If no image path in the request, check if the existing article has one
-                ArticleDTO existingArticle = articleService.getArticleById(id);
-                if (existingArticle != null && existingArticle.getImagePath() != null) {
-                    articleDTO.setImagePath(existingArticle.getImagePath());
-                    logger.info("Preserving existing image path: {}", existingArticle.getImagePath());
-                }
+            // Check if we received the version
+            if (articleDTO.getVersion() == null) {
+                logger.error("Version is missing in update request");
+                return new ResponseEntity<>(
+                    Collections.singletonMap("error", "Version is required for updates to prevent conflicts"), 
+                    HttpStatus.BAD_REQUEST
+                );
             }
             
-            ArticleDTO articleDTOAfterUpdate = articleService.updateArticle(id, articleDTO);
-            if (articleDTOAfterUpdate != null) {
-                logger.info("Updated article with id: {} and image path: {}", 
-                           articleDTOAfterUpdate.getId(), articleDTOAfterUpdate.getImagePath());
-                return new ResponseEntity<>(articleDTOAfterUpdate, HttpStatus.OK);
-            } else {
-                return new ResponseEntity<>(Collections.singletonMap("error", "Article not found"), HttpStatus.NOT_FOUND);
+            // Set the ID to ensure correct update
+            articleDTO.setId(id);
+            
+            try {
+                ArticleDTO updatedArticleDTO = articleService.updateArticle(id, articleDTO);
+                return new ResponseEntity<>(updatedArticleDTO, HttpStatus.OK);
+            } catch (OptimisticLockException e) {
+                // This is a version conflict
+                logger.warn("Optimistic lock exception detected: {}", e.getMessage());
+                
+                // Get the current version from the database
+                ArticleDTO currentArticle = articleService.getArticleById(id);
+                
+                // Return a special response with both conflict status code and the current article data
+                Map<String, Object> response = new HashMap<>();
+                response.put("error", "Version conflict detected. Another user has modified this article.");
+                response.put("currentVersion", currentArticle.getVersion());
+                response.put("currentArticle", currentArticle);
+                
+                return new ResponseEntity<>(response, HttpStatus.CONFLICT);
             }
         } catch (Exception e) {
-            logger.error("Error updating article id {}: {}", id, e.getMessage(), e);
+            if (e instanceof OptimisticLockException) {
+                // Handled above
+                throw e;
+            }
+            logger.error("Error updating article: {}", e.getMessage(), e);
             return new ResponseEntity<>(Collections.singletonMap("error", e.getMessage()), 
                                         HttpStatus.INTERNAL_SERVER_ERROR);
         }

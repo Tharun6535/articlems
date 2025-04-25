@@ -88,8 +88,96 @@ Run both Back-end & Front-end in one place:
 
 > [Integrate Vue.js with Spring Boot Rest API](https://www.bezkoder.com/integrate-vue-spring-boot/)
 
-## Run Spring Boot application
-```
+# Environment Configuration
+
+This application supports multiple environments: Development, Test, and Production.
+
+## Environment Profiles
+
+### Development (dev)
+- In-memory H2 database for easy development
+- Debug logging enabled
+- H2 console available at `/h2-console`
+- Default profile if none specified
+
+### Test (test)
+- In-memory H2 database with `create-drop` strategy
+- Increased logging for debugging
+- Integration tests run in this profile
+- Separate file upload directory for test files
+
+### Production (prod)
+- MySQL database (configured via environment variables)
+- Minimal logging
+- SSL required
+- Optimized for security and performance
+
+## Running the Application
+
+### Using Maven
+
+With the appropriate profile:
+
+```bash
+# Development (default)
 mvn spring-boot:run
+
+# Test
+mvn spring-boot:run -Dspring-boot.run.profiles=test
+
+# Production
+mvn spring-boot:run -Dspring-boot.run.profiles=prod
+```
+
+### Using Packaged JAR
+
+```bash
+# Development
+java -jar app.jar --spring.profiles.active=dev
+
+# Test 
+java -jar app.jar --spring.profiles.active=test
+
+# Production
+java -jar app.jar --spring.profiles.active=prod
+```
+
+### Building for Specific Environment
+
+Maven profiles are configured to build for each environment:
+
+```bash
+# Development build
+mvn clean package -Pdev
+
+# Test build
+mvn clean package -Ptest
+
+# Production build
+mvn clean package -Pprod
+```
+
+## Environment Variables
+
+### For Production
+
+The following environment variables can be set for production:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `MYSQL_HOST` | Database host | localhost |
+| `MYSQL_PORT` | Database port | 3306 |
+| `MYSQL_DB` | Database name | proddb |
+| `MYSQL_USER` | Database username | root |
+| `MYSQL_PASSWORD` | Database password | password |
+| `JWT_SECRET` | Secret key for JWT | ProductionSecretKey... |
+| `JWT_EXPIRATION` | JWT expiration in ms | 86400000 |
+| `FILE_UPLOAD_DIR` | Directory for uploads | /app/uploads |
+| `CORS_ORIGINS` | Allowed origins for CORS | https://yourdomain.com |
+| `MAIL_HOST` | SMTP server host | smtp.example.com |
+| `MAIL_PORT` | SMTP server port | 587 |
+| `MAIL_USERNAME` | SMTP username | your_email@example.com |
+| `MAIL_PASSWORD` | SMTP password | your_password |
+| `FRONTEND_URL` | Frontend application URL | https://yourdomain.com |
 ```
 

@@ -45,6 +45,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import PasswordIcon from '@mui/icons-material/Password';
+import { maskEmail } from '../../utils/formatUtils';
 
 const Profile = () => {
   const { user, loading } = useAuth();
@@ -87,6 +88,8 @@ const Profile = () => {
     username: "",
     email: "",
     roles: [],
+    accountCreatedDate: null,
+    accountExpiryDate: null,
   });
 
   useEffect(() => {
@@ -108,6 +111,11 @@ const Profile = () => {
       setUsername(user.username);
       setEmail(user.email);
       setIsLoading(false);
+      
+      // Fetch user profile from API to get created/expiry dates
+      UserService.getUserProfile().then(res => {
+        setUserProfile(res.data);
+      });
       
       // Check if user has 2FA enabled
       const check2FAStatus = async () => {
@@ -417,9 +425,16 @@ const Profile = () => {
                   {user.username.charAt(0).toUpperCase()}
                 </Avatar>
                 
-                <Typography variant="subtitle1" gutterBottom>
-                  Member since {new Date().getFullYear()}
-                </Typography>
+                {userProfile.accountCreatedDate && (
+                  <Typography variant="subtitle1" gutterBottom>
+                    Member since {new Date(userProfile.accountCreatedDate).toLocaleDateString()}
+                  </Typography>
+                )}
+                {userProfile.accountExpiryDate && (
+                  <Typography variant="subtitle2" color="error" gutterBottom>
+                    Account expires on {new Date(userProfile.accountExpiryDate).toLocaleDateString()}
+                  </Typography>
+                )}
               </Box>
               
               <Box sx={{ px: { xs: 1, sm: 2 } }}>
@@ -455,23 +470,32 @@ const Profile = () => {
                     <Typography variant="body2" color="text.secondary" gutterBottom>
                       Email Address
                     </Typography>
-                    <TextField
-                      fullWidth
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled={!editMode}
-                      variant={editMode ? "outlined" : "filled"}
-                      size="small"
-                      sx={{
-                        '& .MuiFilledInput-root': {
-                          borderRadius: 1,
-                          bgcolor: editMode ? 'transparent' : '#f5f8fa',
-                          '&:before, &:after': {
-                            display: 'none'
+                    {editMode ? (
+                      <TextField
+                        fullWidth
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        variant="outlined"
+                        size="small"
+                      />
+                    ) : (
+                      <TextField
+                        fullWidth
+                        value={maskEmail(email)}
+                        disabled
+                        variant="filled"
+                        size="small"
+                        sx={{
+                          '& .MuiFilledInput-root': {
+                            borderRadius: 1,
+                            bgcolor: '#f5f8fa',
+                            '&:before, &:after': {
+                              display: 'none'
+                            }
                           }
-                        }
-                      }}
-                    />
+                        }}
+                      />
+                    )}
                   </Box>
                 </Box>
                 

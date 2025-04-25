@@ -82,7 +82,6 @@ const ArticleList = () => {
   const [selectedTab, setSelectedTab] = useState(0);
   const [categoryMap, setCategoryMap] = useState({});
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [likedArticles, setLikedArticles] = useState({});
   const [animateCards, setAnimateCards] = useState(true);
 
   // Function to fetch categories
@@ -112,7 +111,7 @@ const ArticleList = () => {
       setError(null); // Clear previous errors
       
       // Only send supported sort fields to the API
-      const apiSortField = sortField === 'likes' ? 'id' : sortField;
+      const apiSortField = sortField === 'id' ? 'id' : sortField;
       
       const response = await getArticlesPaginated(page, size, apiSortField, sortDirection, searchTitle);
       console.log('API Response:', response);
@@ -124,26 +123,6 @@ const ArticleList = () => {
       const filterStatus = getFilterByTab(selectedTab);
       if (filterStatus) {
         articlesData = articlesData.filter(article => article.statusEnum === filterStatus);
-      }
-      
-      // Get liked articles from localStorage
-      const storedLikedArticles = JSON.parse(localStorage.getItem('likedArticles') || '{}');
-      setLikedArticles(storedLikedArticles);
-      
-      // Add like counts to articles (in a real app this would come from backend)
-      articlesData = articlesData.map(article => ({
-        ...article,
-        likeCount: article.likeCount || Math.floor(Math.random() * 50), // Using random as placeholder
-        isLiked: !!storedLikedArticles[article.id]
-      }));
-      
-      // Sort by likes if sortField is 'likes' (do this locally instead of API)
-      if (sortField === 'likes') {
-        articlesData.sort((a, b) => {
-          return sortDirection === 'desc' 
-            ? b.likeCount - a.likeCount
-            : a.likeCount - b.likeCount;
-        });
       }
       
       setArticles(articlesData);
@@ -225,39 +204,6 @@ const ArticleList = () => {
     setPage(0); // Reset page on sort change
   };
 
-  const handleToggleLike = (articleId) => {
-    const newLikedArticles = { ...likedArticles };
-    const isCurrentlyLiked = newLikedArticles[articleId];
-    
-    if (isCurrentlyLiked) {
-      delete newLikedArticles[articleId];
-    } else {
-      newLikedArticles[articleId] = true;
-    }
-    
-    // Update localStorage
-    localStorage.setItem('likedArticles', JSON.stringify(newLikedArticles));
-    setLikedArticles(newLikedArticles);
-    
-    // Update articles in state
-    setArticles(prev => 
-      prev.map(article => {
-        if (article.id === articleId) {
-          const newLikeCount = article.likeCount + (isCurrentlyLiked ? -1 : 1);
-          return {
-            ...article,
-            likeCount: newLikeCount,
-            isLiked: !isCurrentlyLiked
-          };
-        }
-        return article;
-      })
-    );
-    
-    // In a real application, you would also send this update to the backend
-    // Example: updateArticleLike(articleId, !isCurrentlyLiked);
-  };
-
   const getStatusColor = (status) => {
     switch (status) {
       case 'PUBLISHED':
@@ -320,8 +266,7 @@ const ArticleList = () => {
     { title: 'Title', dataKey: 'title' },
     { title: 'Status', dataKey: 'statusEnum' },
     { title: 'Category', dataKey: 'categoryName' },
-    { title: 'Created Date', dataKey: 'createdDate' },
-    { title: 'Likes', dataKey: 'likeCount' }
+    { title: 'Created Date', dataKey: 'createdDate' }
   ];
 
   // Prepare data for export
@@ -329,8 +274,7 @@ const ArticleList = () => {
     return articles.map(article => ({
       ...article,
       categoryName: categoryMap[article.categoryId] || 'Unknown',
-      createdDate: formatDate(article.createDateTime),
-      likeCount: article.likeCount // Ensure likeCount is included
+      createdDate: formatDate(article.createDateTime)
     }));
   };
 
@@ -365,9 +309,7 @@ const ArticleList = () => {
     { value: 'id,desc', label: 'Newest First' },
     { value: 'id,asc', label: 'Oldest First' },
     { value: 'title,asc', label: 'Title (A-Z)' },
-    { value: 'title,desc', label: 'Title (Z-A)' },
-    { value: 'likeCount,desc', label: 'Most Liked' },
-    { value: 'likeCount,asc', label: 'Least Liked' }
+    { value: 'title,desc', label: 'Title (Z-A)' }
   ];
 
   return (
@@ -431,7 +373,6 @@ const ArticleList = () => {
               >
                 <MenuItem value="id">Date (Newest)</MenuItem>
                 <MenuItem value="title">Title</MenuItem>
-                <MenuItem value="likes">Popularity</MenuItem>
               </Select>
             </FormControl>
             <Tooltip title={sortDirection === 'asc' ? "Ascending" : "Descending"}>
@@ -489,7 +430,7 @@ const ArticleList = () => {
               lg={viewMode === 'list' ? 12 : 4}
               sx={{
                 display: 'flex',
-                alignItems: 'stretch',
+                height: 360,
                 opacity: animateCards ? 1 : 0,
                 transform: animateCards ? 'translateY(0)' : 'translateY(20px)',
                 transition: `all 0.3s ease-out ${index * 0.1}s`
@@ -498,9 +439,7 @@ const ArticleList = () => {
               <Card 
                 variant="outlined"
                 sx={{ 
-                  height: 370,
-                  minHeight: 370,
-                  maxHeight: 370,
+                  height: '100%',
                   display: 'flex',
                   flexDirection: viewMode === 'list' ? 'row' : 'column',
                   borderRadius: 3,
@@ -692,48 +631,10 @@ const ArticleList = () => {
                       py: 1.5,
                       borderTop: '1px solid',
                       borderColor: 'divider',
-                      justifyContent: 'space-between',
+                      justifyContent: 'flex-end',
                       minHeight: 56
                     }}
                   >
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Tooltip title={article.isLiked ? "Unlike" : "Like"}>
-                        <IconButton 
-                          size="small" 
-                          color={article.isLiked ? "secondary" : "default"}
-                          onClick={() => handleToggleLike(article.id)}
-                          sx={{
-                            transition: 'all 0.2s',
-                            '&:hover': {
-                              transform: 'scale(1.1)',
-                              color: 'secondary.main',
-                              backgroundColor: theme => alpha(theme.palette.secondary.main, 0.1)
-                            }
-                          }}
-                        >
-                          {article.isLiked ? <FavoriteIcon /> : <FavoriteBorderIcon />}
-                        </IconButton>
-                      </Tooltip>
-                      <Typography 
-                        variant="body2" 
-                        color="text.secondary"
-                        sx={{ ml: 0.5, mr: 2 }}
-                      >
-                        {article.likeCount || 0}
-                      </Typography>
-                      <Tooltip title="Views">
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <VisibilityIcon fontSize="small" color="action" />
-                          <Typography 
-                            variant="body2" 
-                            color="text.secondary"
-                            sx={{ ml: 0.5 }}
-                          >
-                            {article.viewCount || Math.floor(Math.random() * 1000) + 100}
-                          </Typography>
-                        </Box>
-                      </Tooltip>
-                    </Box>
                     <Button 
                       component={RouterLink}
                       to={`/articles/${article.id}`}

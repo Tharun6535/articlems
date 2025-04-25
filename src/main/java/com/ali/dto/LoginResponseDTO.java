@@ -10,6 +10,29 @@ public class LoginResponseDTO {
     private String username;
     private List<String> roles;
 
+    // Default no-args constructor
+    public LoginResponseDTO() {
+    }
+
+    // Constructor for error responses (5 args with nulls)
+    public LoginResponseDTO(boolean success, String message, String token, String username, Boolean mfaRequired) {
+        this.success = success;
+        this.message = message;
+        this.token = token;
+        this.username = username;
+        this.mfaRequired = mfaRequired != null ? mfaRequired : false;
+    }
+
+    // Constructor for successful login responses (6 args with roles)
+    public LoginResponseDTO(boolean success, String message, String token, String username, boolean mfaRequired, List<String> roles) {
+        this.success = success;
+        this.message = message;
+        this.token = token;
+        this.username = username;
+        this.mfaRequired = mfaRequired;
+        this.roles = roles;
+    }
+
     public String getToken() {
         return token;
     }

@@ -226,7 +226,7 @@ public class ArticleServiceImpl implements ArticleService {
     @Override
     public Page<ArticleDTO> getAllArticlesPaged(String title, Pageable pageable) {
         Page<Article> articlePage;
-        if (title == null)
+        if (title == null || title.trim().isEmpty())
             articlePage = articleRepository.findAll(pageable);
         else
             articlePage = articleRepository.findByTitleContainingIgnoreCase(title, pageable);

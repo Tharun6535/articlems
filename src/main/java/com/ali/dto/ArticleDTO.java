@@ -31,6 +31,8 @@ public class ArticleDTO {
     private LocalDateTime createDateTime;
 
     private LocalDateTime updateDateTime;
+    
+    private Long version;
 
     public LocalDateTime getCreateDateTime() {
         return createDateTime;
@@ -103,5 +105,12 @@ public class ArticleDTO {
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
     }
-
+    
+    public Long getVersion() {
+        return version;
+    }
+    
+    public void setVersion(Long version) {
+        this.version = version;
+    }
 }

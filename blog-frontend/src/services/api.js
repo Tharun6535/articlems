@@ -2,8 +2,8 @@ import axios from 'axios';
 import authHeader from './auth-header';
 
 // Update the API URL to match where your backend is running
-// Using absolute URL since we've seen images using http://localhost:8081
-export const API_URL = 'http://localhost:8081/api';
+// Using absolute URL since we've seen images using http://localhost:8080
+export const API_URL = 'http://localhost:8080/api';
 // Fallback to relative URL if needed
 // const API_URL = '/api';
 
@@ -143,6 +143,11 @@ export const updateArticle = (id, article) => {
     article.categoryId = parseInt(article.categoryId, 10);
   }
   
+  // Ensure version is included
+  if (article.version === undefined) {
+    console.warn('Warning: Article version is missing for optimistic locking');
+  }
+  
   return api.put(`/articles/${id}`, article);
 };
 
@@ -254,7 +259,7 @@ export const uploadImage = (file, onProgressCallback) => {
     console.log('Upload successful, response:', response);
     // Simplify the response to avoid long strings
     if (response.data && response.data.url) {
-      // Just return the relative path without domain, removing any http://localhost:8081 prefix
+      // Just return the relative path without domain, removing any http://localhost:8080 prefix
       if (response.data.url.includes('http')) {
         const url = new URL(response.data.url);
         response.data.url = url.pathname;

@@ -23,6 +23,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import java.util.Collections;
 import java.util.HashSet;
@@ -40,6 +41,7 @@ import com.ali.payload.response.TempTokenResponse;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import org.springframework.http.HttpStatus;
 
 @CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true", maxAge = 3600)
 @RestController
@@ -255,55 +257,99 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponseDTO> login(@RequestBody LoginRequestDTO loginRequest) {
-        // First, validate username and password
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        loginRequest.getUsername(),
-                        loginRequest.getPassword()
-                )
-        );
-
-        // If we get here, authentication was successful
-        User user = userRepository.findByUsernameWithRoles(loginRequest.getUsername())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-        
-        LoginResponseDTO response = new LoginResponseDTO();
-        response.setUsername(user.getUsername());
-        response.setRoles(
-            user.getRoles().stream().map(r -> r.getName().name()).collect(Collectors.toList())
-        );
-        
-        // Check if MFA is enabled for this user
-        if (user.isMfaEnabled()) {
-            // If MFA is enabled, we need to verify the MFA code
-            if (loginRequest.getMfaCode() == null || loginRequest.getMfaCode().trim().isEmpty()) {
-                // No MFA code provided, but required
-                response.setSuccess(false);
-                response.setMfaRequired(true);
-                response.setMessage("MFA verification required");
-                return ResponseEntity.ok(response);
+    public ResponseEntity<LoginResponseDTO> login(@RequestBody LoginRequestDTO loginRequest, HttpServletRequest request) {
+        try {
+            logger.info("Login attempt for user: {}", loginRequest.getUsername());
+            
+            // Get the user from the repository
+            Optional<User> userOpt = userRepository.findByUsername(loginRequest.getUsername());
+            if (!userOpt.isPresent()) {
+                logger.warn("Login failed - User not found: {}", loginRequest.getUsername());
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new LoginResponseDTO(false, "Invalid username or password", null, null, null));
             }
             
-            // Validate MFA code
-            boolean isValidCode = mfaService.verifyCode(user.getMfaSecret(), loginRequest.getMfaCode());
-            if (!isValidCode) {
-                response.setSuccess(false);
-                response.setMfaRequired(true);
-                response.setMessage("Invalid MFA code");
-                return ResponseEntity.ok(response);
+            User user = userOpt.get();
+            logger.debug("Found user: {} with email: {}", user.getUsername(), user.getEmail());
+            
+            // Check if account is active
+            if (!user.isActive()) {
+                logger.warn("Login attempt for inactive account: {}", loginRequest.getUsername());
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new LoginResponseDTO(false, "Account is not active", null, null, null));
             }
+            
+            // Check if account is expired
+            if (user.isAccountExpired()) {
+                logger.warn("Login attempt for expired account: {}", loginRequest.getUsername());
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new LoginResponseDTO(false, "Account has expired", null, null, null));
+            }
+            
+            // Check password
+            if (!encoder.matches(loginRequest.getPassword(), user.getPassword())) {
+                logger.warn("Login failed - Invalid password for user: {}", loginRequest.getUsername());
+                // Increment failed attempts
+                user.incrementFailedLoginAttempts();
+                userRepository.save(user);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new LoginResponseDTO(false, "Invalid username or password", null, null, null));
+            }
+            
+            // Reset failed login attempts on successful login
+            if (user.getFailedLoginAttempts() > 0) {
+                user.resetFailedLoginAttempts();
+                userRepository.save(user);
+            }
+            
+            // Check if MFA is enabled and MFA code is required
+            if (user.isMfaEnabled()) {
+                // If MFA code is provided, validate it
+                if (loginRequest.getMfaCode() != null && !loginRequest.getMfaCode().isEmpty()) {
+                    boolean validCode = mfaService.verifyCode(user.getMfaSecret(), loginRequest.getMfaCode());
+                    if (!validCode) {
+                        logger.warn("Login failed - Invalid MFA code for user: {}", loginRequest.getUsername());
+                        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                .body(new LoginResponseDTO(false, "Invalid verification code", null, null, null));
+                    }
+                    // MFA validation passed, continue with login
+                    logger.info("MFA validation passed for user: {}", loginRequest.getUsername());
+                } else {
+                    // MFA code required but not provided
+                    logger.info("MFA code required for user: {}", loginRequest.getUsername());
+                    return ResponseEntity.ok(new LoginResponseDTO(true, "MFA verification required", null, user.getUsername(), true));
+                }
+            }
+            
+            // Create authentication token and set in security context
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            
+            // Generate JWT
+            String token = jwtUtils.generateJwtToken(authentication);
+            
+            // Get user details and roles
+            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            List<String> roles = userDetails.getAuthorities().stream()
+                    .map(item -> item.getAuthority())
+                    .collect(Collectors.toList());
+            
+            logger.info("Login successful for user: {}", loginRequest.getUsername());
+            // Return success response with token and user details
+            return ResponseEntity.ok(new LoginResponseDTO(
+                    true, 
+                    "Login successful", 
+                    token, 
+                    user.getUsername(), 
+                    false, 
+                    roles
+            ));
+        } catch (Exception e) {
+            logger.error("Error during login for user: {}", loginRequest.getUsername(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new LoginResponseDTO(false, "Server error: " + e.getMessage(), null, null, null));
         }
-        
-        // If we reach here, either MFA was not required or it was successfully validated
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = jwtUtils.generateJwtToken(authentication);
-        
-        response.setSuccess(true);
-        response.setToken(jwt);
-        response.setMessage("Login successful");
-        
-        return ResponseEntity.ok(response);
     }
     
     @PostMapping("/validate-mfa")
@@ -370,5 +416,37 @@ public class AuthController {
         }
         userService.updatePassword(user, encoder.encode(newPassword));
         return ResponseEntity.ok(new MessageResponse("Password has been reset successfully."));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logoutUser(@RequestHeader("Authorization") String authHeader, HttpServletRequest request) {
+        try {
+            logger.info("Logout requested from IP: {}", request.getRemoteAddr());
+            
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                String jwt = authHeader.substring(7);
+                String username = jwtUtils.getUserNameFromJwtToken(jwt);
+                
+                // Add the token to the blacklist
+                boolean blacklisted = jwtUtils.blacklistToken(jwt, "User logout");
+                
+                if (blacklisted) {
+                    logger.info("User {} successfully logged out", username);
+                    return ResponseEntity.ok(new MessageResponse("You have been successfully logged out"));
+                } else {
+                    logger.warn("Failed to blacklist token during logout for user: {}", username);
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body(new MessageResponse("Logout failed. Please try again."));
+                }
+            } else {
+                logger.warn("Logout attempt without a valid authorization header");
+                return ResponseEntity.badRequest()
+                        .body(new MessageResponse("No valid authentication token found"));
+            }
+        } catch (Exception e) {
+            logger.error("Unexpected error during logout", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new MessageResponse("Logout failed due to an unexpected error"));
+        }
     }
 } 

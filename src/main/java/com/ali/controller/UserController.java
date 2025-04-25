@@ -38,7 +38,17 @@ public class UserController {
         
         // Don't send the password or sensitive information
         user.setPassword(null);
-        return ResponseEntity.ok(user);
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("id", user.getId());
+        profile.put("username", user.getUsername());
+        profile.put("email", user.getEmail());
+        profile.put("roles", user.getRoles());
+        profile.put("mfaEnabled", user.isMfaEnabled());
+        profile.put("accountCreatedDate", user.getCreateDateTime());
+        profile.put("accountExpiryDate", user.getAccountExpiryDate());
+        profile.put("active", user.isActive());
+        profile.put("accountExpired", user.isAccountExpired());
+        return ResponseEntity.ok(profile);
     }
 
     @PostMapping("/update-profile")

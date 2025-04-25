@@ -13,12 +13,14 @@ import java.util.List;
 public interface ArticleMapper {
     @Mapping(source = "category.id", target = "categoryId")
     @Mapping(source = "imagePath", target = "imagePath")
+    @Mapping(source = "version", target = "version")
     ArticleDTO entityToDTO(Article article);
 
     List<ArticleDTO> entityToDTOList(List<Article> articleList);
     
     @Mapping(source = "categoryId", target = "category.id")
     @Mapping(source = "imagePath", target = "imagePath")
+    @Mapping(source = "version", target = "version")
     @Mapping(target = "comments", ignore = true)
     Article dtoToEntity(ArticleDTO articleDTO);
 

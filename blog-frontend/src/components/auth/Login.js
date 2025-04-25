@@ -35,6 +35,7 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AuthService from '../../services/auth.service';
 import UserService from '../../services/user.service';
+import { maskEmail } from '../../utils/formatUtils';
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -100,6 +101,13 @@ const Login = () => {
         return;
       }
       
+      // If there's an error message from the API response
+      if (response.message && !response.success) {
+        setMessage(response.message);
+        setLoading(false);
+        return;
+      }
+      
       console.log('Login successful, redirecting to:', from);
       // Redirect to the previous page or home
       navigate(from, { replace: true });
@@ -128,7 +136,7 @@ const Login = () => {
     try {
       // Make sure we have a username to use for MFA validation
       const usernameForMfa = currentMfaUsername || mfaUsername || username;
-      console.log('Validating MFA code for user:', usernameForMfa);
+      console.log('Validating MFA code for user:', maskEmail(usernameForMfa));
       
       if (!usernameForMfa) {
         throw new Error('Username is missing for MFA validation');
@@ -235,6 +243,26 @@ const Login = () => {
       );
     }
     setResetLoading(false);
+  };
+
+  const handleValidateMfa = async () => {
+    try {
+      setLoading(true);
+      setMfaError("");
+      
+      const usernameToUse = currentMfaUsername || mfaUsername;
+      console.log("Validating MFA code for user:", maskEmail(usernameToUse)); // Mask email in logs
+      
+      await validateMfa(mfaCode);
+      
+      // Redirect after successful validation
+      navigate("/");
+    } catch (error) {
+      console.error("MFA validation failed:", error);
+      setMfaError(error.response?.data?.message || "Invalid verification code. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
